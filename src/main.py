@@ -58,8 +58,8 @@ if __name__ == '__main__':
     print(vpt_test_tensor_cuda)
     #print(vpt_test_tensor_vulkan)
 
-    del vpt_renderer
-
     #plt.imshow(vpt_test_tensor_cpu.permute(1, 2, 0))
     plt.imshow(vpt_test_tensor_cuda.cpu().permute(1, 2, 0))
     plt.show()
+
+    del vpt_renderer
