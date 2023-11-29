@@ -156,3 +156,4 @@ cython_debug/
 # Test images
 *.png
 .jpg
+out/*

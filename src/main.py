@@ -24,10 +24,95 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import random
+import pathlib
 import matplotlib.pyplot as plt
+import numpy as np
 import torch
+#conda install -c conda-forge openexr-python
+import OpenEXR
+import Imath
+import array
 from vpt import VolumetricPathTracingRenderer
 import time
+
+
+def save_tensor_openexr(file_path, data, dtype=np.float16):
+    if dtype == np.float32:
+        pt = Imath.PixelType(Imath.PixelType.FLOAT)
+    elif dtype == np.float16:
+        pt = Imath.PixelType(Imath.PixelType.HALF)
+    else:
+        raise Exception('Error in save_tensor_openexr: Invalid format.')
+    if data.dtype != dtype:
+        data = data.astype(dtype)
+    header = OpenEXR.Header(data.shape[2], data.shape[1])
+    header['channels'] = {'R': Imath.Channel(pt), 'G': Imath.Channel(pt), 'B': Imath.Channel(pt)}
+    out = OpenEXR.OutputFile(file_path, header)
+    reds = data[0, :, :].tobytes()
+    greens = data[1, :, :].tobytes()
+    blues = data[2, :, :].tobytes()
+    out.writePixels({'R': reds, 'G': greens, 'B': blues})
+
+
+def save_camera_config(file_path, view_matrix):
+    with open(file_path, 'w') as f:
+        for i in range(16):
+            if i != 0:
+                f.write(' ')
+            f.write(f'{view_matrix[i]}')
+
+
+def vec_cross(v0, v1):
+    return np.array([
+        v0[1] * v1[2] - v0[2] * v1[1],
+        v0[2] * v1[0] - v0[0] * v1[2],
+        v0[0] * v1[1] - v0[1] * v1[0],
+    ])
+
+
+def vec_length(p):
+    return np.sqrt(p[0] * p[0] + p[1] * p[1] + p[2] * p[2])
+
+
+def vec_normalize(p):
+    l = vec_length(p)
+    return np.array([p[0] / l, p[1] / l, p[2] / l])
+
+
+def matrix_translation(t):
+    return np.array([
+        [1.0, 0.0, 0.0, t[0]],
+        [0.0, 1.0, 0.0, t[1]],
+        [0.0, 0.0, 1.0, t[2]],
+        [0.0, 0.0, 0.0, 1.0]
+    ])
+
+
+def sample_view_matrix(aabb):
+    global_up = np.array([0.0, 1.0, 0.0])
+    theta = 2.0 * np.pi * random.random()
+    phi = np.arccos(1.0 - 2.0 * random.random())
+    r_total = 0.5 * vec_length(np.array([aabb[1] - aabb[0], aabb[3] - aabb[2], aabb[5] - aabb[4]]))
+    r = random.uniform(r_total / 16.0, r_total / 2.0)
+    camera_position = np.array([r * np.sin(phi) * np.cos(theta), r * np.sin(phi) * np.sin(theta), r * np.cos(phi)])
+    camera_forward = vec_normalize(camera_position)
+    camera_right = vec_normalize(vec_cross(global_up, camera_forward))
+    camera_up = vec_normalize(vec_cross(camera_forward, camera_right))
+    rotation_matrix = np.empty((4, 4))
+    for i in range(4):
+        rotation_matrix[i, 0] = camera_right[i] if i < 3 else 0.0
+        rotation_matrix[i, 1] = camera_up[i] if i < 3 else 0.0
+        rotation_matrix[i, 2] = camera_forward[i] if i < 3 else 0.0
+        rotation_matrix[i, 3] = 0.0 if i < 3 else 1.0
+    inverse_view_matrix = matrix_translation(camera_position).dot(rotation_matrix)
+    view_matrix = np.linalg.inv(inverse_view_matrix)
+    view_matrix_array = np.empty(16)
+    for i in range(4):
+        for j in range(4):
+            view_matrix_array[i * 4 + j] = view_matrix[j, i]
+    return view_matrix_array
+
 
 if __name__ == '__main__':
     cuda_device_idx = 0
@@ -43,23 +128,59 @@ if __name__ == '__main__':
     #print(cuda_device)
     #print(vulkan_device)
 
-    test_tensor_cpu = torch.ones((4, 128, 256), dtype=torch.float32, device=cpu_device)
-    test_tensor_cuda = torch.ones((4, 128, 256), dtype=torch.float32, device=cuda_device)
+    test_mode = False
+    image_width = 512
+    image_height = 512
+
+    test_tensor_cpu = torch.ones((4, image_height, image_width), dtype=torch.float32, device=cpu_device)
+    test_tensor_cuda = torch.ones((4, image_height, image_width), dtype=torch.float32, device=cuda_device)
     #test_tensor_vulkan = torch.ones(1, dtype=torch.float32, device=vulkan_device)
     #test_tensor_vulkan = test_tensor_cpu.to(vulkan_device)
     print(test_tensor_cpu)
     print(test_tensor_cuda)
     #print(test_tensor_vulkan)
     vpt_renderer = VolumetricPathTracingRenderer()
-    vpt_test_tensor_cpu = vpt_renderer(test_tensor_cpu)
-    vpt_test_tensor_cuda = vpt_renderer(test_tensor_cuda)
-    #vpt_test_tensor_vulkan = vpt_renderer(test_tensor_vulkan)
-    #print(vpt_test_tensor_cpu)
-    print(vpt_test_tensor_cuda)
-    #print(vpt_test_tensor_vulkan)
+    render_module = vpt_renderer.module()
 
-    #plt.imshow(vpt_test_tensor_cpu.permute(1, 2, 0))
-    plt.imshow(vpt_test_tensor_cuda.cpu().permute(1, 2, 0))
-    plt.show()
+    pathlib.Path('out').mkdir(exist_ok=True)
+    with open('out/extrinsics.txt', 'w') as f:
+        f.write(f'{vpt_renderer.module().get_camera_fovy()}')
+    aabb = vpt_renderer.module().get_render_bounding_box()
+
+    vpt_renderer.module().load_volume_file(
+        '/mnt/data/Flow/Scalar/Wholebody [512 512 3172] (CT)/wholebody.dat')
+    vpt_renderer.module().load_environment_map(
+        '/home/neuhauser/Programming/C++/CloudRendering/Data/CloudDataSets/env_maps/small_empty_room_1_4k_blurred.exr')
+    vpt_renderer.module().set_use_transfer_function(True)
+    vpt_renderer.module().load_transfer_function_file(
+        '/home/neuhauser/Programming/C++/CloudRendering/Data/TransferFunctions/TF_Wholebody3.xml')
+    vpt_renderer.module().set_vpt_mode_from_name('Delta Tracking')
+    vpt_renderer.module().set_use_isosurfaces(True)
+    #vpt_renderer.module().set_iso_value(0.360)
+    vpt_renderer.module().set_iso_value(0.3)
+    vpt_renderer.module().set_surface_brdf('Lambertian')
+    #vpt_renderer.module().set_surface_brdf('Blinn Phong')
+
+    vpt_renderer.module().set_camera_position([0.0, 0.0, 0.3])
+    vpt_renderer.module().set_camera_target([0.0, 0.0, 0.0])
+
+    for i in range(16):
+        view_matrix = sample_view_matrix(aabb)
+        vpt_renderer.module().overwrite_camera_view_matrix(view_matrix)
+        vpt_test_tensor_cuda = vpt_renderer(test_tensor_cuda)
+
+        save_tensor_openexr(f'out/img_{i}.exr', vpt_test_tensor_cuda.cpu().numpy())
+        save_camera_config(f'out/intrinsics_{i}.txt', vpt_renderer.module().get_camera_view_matrix())
+
+        if test_mode:
+            #vpt_test_tensor_cpu = vpt_renderer(test_tensor_cpu)
+            #vpt_test_tensor_vulkan = vpt_renderer(test_tensor_vulkan)
+            # print(vpt_test_tensor_cpu)
+            print(vpt_test_tensor_cuda)
+            # print(vpt_test_tensor_vulkan)
+            # plt.imshow(vpt_test_tensor_cpu.permute(1, 2, 0))
+            plt.imshow(vpt_test_tensor_cuda.cpu().permute(1, 2, 0))
+            plt.show()
+            break
 
     del vpt_renderer
