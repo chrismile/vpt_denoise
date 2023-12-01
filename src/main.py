@@ -24,7 +24,9 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import os
 import random
+import json
 import pathlib
 import matplotlib.pyplot as plt
 import numpy as np
@@ -89,7 +91,32 @@ def matrix_translation(t):
     ])
 
 
-def sample_view_matrix(aabb):
+def sample_view_matrix_circle(aabb):
+    global_up = np.array([0.0, 1.0, 0.0])
+    theta = 2.0 * np.pi * random.random()
+    phi = np.arccos(1.0 - 2.0 * random.random())
+    r_total = 0.5 * vec_length(np.array([aabb[1] - aabb[0], aabb[3] - aabb[2], aabb[5] - aabb[4]]))
+    r = random.uniform(r_total / 16.0, r_total / 2.0)
+    camera_position = np.array([r * np.sin(phi) * np.cos(theta), r * np.sin(phi) * np.sin(theta), r * np.cos(phi)])
+    camera_forward = vec_normalize(camera_position)
+    camera_right = vec_normalize(vec_cross(global_up, camera_forward))
+    camera_up = vec_normalize(vec_cross(camera_forward, camera_right))
+    rotation_matrix = np.empty((4, 4))
+    for i in range(4):
+        rotation_matrix[i, 0] = camera_right[i] if i < 3 else 0.0
+        rotation_matrix[i, 1] = camera_up[i] if i < 3 else 0.0
+        rotation_matrix[i, 2] = camera_forward[i] if i < 3 else 0.0
+        rotation_matrix[i, 3] = 0.0 if i < 3 else 1.0
+    inverse_view_matrix = matrix_translation(camera_position).dot(rotation_matrix)
+    view_matrix = np.linalg.inv(inverse_view_matrix)
+    view_matrix_array = np.empty(16)
+    for i in range(4):
+        for j in range(4):
+            view_matrix_array[i * 4 + j] = view_matrix[j, i]
+    return view_matrix_array
+
+
+def sample_view_matrix_box(aabb):
     global_up = np.array([0.0, 1.0, 0.0])
     theta = 2.0 * np.pi * random.random()
     phi = np.arccos(1.0 - 2.0 * random.random())
@@ -129,8 +156,8 @@ if __name__ == '__main__':
     #print(vulkan_device)
 
     test_mode = False
-    image_width = 512
-    image_height = 512
+    image_width = 1024
+    image_height = 1024
 
     test_tensor_cpu = torch.ones((4, image_height, image_width), dtype=torch.float32, device=cpu_device)
     test_tensor_cuda = torch.ones((4, image_height, image_width), dtype=torch.float32, device=cuda_device)
@@ -142,18 +169,23 @@ if __name__ == '__main__':
     vpt_renderer = VolumetricPathTracingRenderer()
     render_module = vpt_renderer.module()
 
-    pathlib.Path('out').mkdir(exist_ok=True)
-    with open('out/extrinsics.txt', 'w') as f:
-        f.write(f'{vpt_renderer.module().get_camera_fovy()}')
+    #pathlib.Path('out').mkdir(exist_ok=True)
+    #with open('out/extrinsics.txt', 'w') as f:
+    #    f.write(f'{vpt_renderer.module().get_camera_fovy()}')
     aabb = vpt_renderer.module().get_render_bounding_box()
+    camera_infos = []
 
+    data_dir = '/mnt/data/Flow/Scalar/'
+    if not os.path.isdir(data_dir):
+        data_dir = '/media/christoph/Elements/Datasets/Scalar/'
     vpt_renderer.module().load_volume_file(
-        '/mnt/data/Flow/Scalar/Wholebody [512 512 3172] (CT)/wholebody.dat')
+        data_dir + 'Wholebody [512 512 3172] (CT)/wholebody.dat')
     vpt_renderer.module().load_environment_map(
-        '/home/neuhauser/Programming/C++/CloudRendering/Data/CloudDataSets/env_maps/small_empty_room_1_4k_blurred.exr')
+        str(pathlib.Path.home())
+        + '/Programming/C++/CloudRendering/Data/CloudDataSets/env_maps/small_empty_room_1_4k_blurred.exr')
     vpt_renderer.module().set_use_transfer_function(True)
     vpt_renderer.module().load_transfer_function_file(
-        '/home/neuhauser/Programming/C++/CloudRendering/Data/TransferFunctions/TF_Wholebody3.xml')
+        str(pathlib.Path.home()) + '/Programming/C++/CloudRendering/Data/TransferFunctions/TF_Wholebody3.xml')
     vpt_renderer.module().set_vpt_mode_from_name('Delta Tracking')
     vpt_renderer.module().set_use_isosurfaces(True)
     #vpt_renderer.module().set_iso_value(0.360)
@@ -165,12 +197,27 @@ if __name__ == '__main__':
     vpt_renderer.module().set_camera_target([0.0, 0.0, 0.0])
 
     for i in range(16):
-        view_matrix = sample_view_matrix(aabb)
+        #view_matrix = sample_view_matrix_circle(aabb)
+        view_matrix = sample_view_matrix_box(aabb)
         vpt_renderer.module().overwrite_camera_view_matrix(view_matrix)
         vpt_test_tensor_cuda = vpt_renderer(test_tensor_cuda)
 
-        save_tensor_openexr(f'out/img_{i}.exr', vpt_test_tensor_cuda.cpu().numpy())
-        save_camera_config(f'out/intrinsics_{i}.txt', vpt_renderer.module().get_camera_view_matrix())
+        img_name = f'img_{i}.exr'
+        save_tensor_openexr(f'out/{img_name}', vpt_test_tensor_cuda.cpu().numpy())
+        #save_camera_config(f'out/intrinsics_{i}.txt', vpt_renderer.module().get_camera_view_matrix())
+
+        vm = vpt_renderer.module().get_camera_view_matrix()
+        camera_info = dict()
+        camera_info['id'] = i
+        camera_info['img_name'] = img_name
+        camera_info['width'] = image_width
+        camera_info['height'] = image_height
+        camera_info['position'] = [vm[i] for i in range(12, 15)]
+        camera_info['rotation'] = [
+            [vm[i] for i in range(0, 3)], [vm[i] for i in range(4, 7)], [vm[i] for i in range(8, 11)]
+        ]
+        camera_info['fovy'] = vpt_renderer.module().get_camera_fovy()
+        camera_infos.append(camera_info)
 
         if test_mode:
             #vpt_test_tensor_cpu = vpt_renderer(test_tensor_cpu)
@@ -182,5 +229,8 @@ if __name__ == '__main__':
             plt.imshow(vpt_test_tensor_cuda.cpu().permute(1, 2, 0))
             plt.show()
             break
+
+    with open('out/cameras.json', 'w') as f:
+        json.dump(camera_infos, f, ensure_ascii=False, indent=4)
 
     del vpt_renderer

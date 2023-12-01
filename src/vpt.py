@@ -54,7 +54,7 @@ class VolumetricPathTracingRenderer(object):
         #    color_image_relit = torch.ops.sh_aug.render_frame(input_tensor)
         #else:
         #    color_image_relit = torch.ops.sh_aug.render_frame(input_tensor)
-        color_image_relit = torch.ops.vpt.render_frame(input_tensor, 4096)
+        color_image_relit = torch.ops.vpt.render_frame(input_tensor, 16384)
         return color_image_relit
 
     def module(self):
