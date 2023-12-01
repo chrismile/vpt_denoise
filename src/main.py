@@ -39,7 +39,7 @@ from vpt import VolumetricPathTracingRenderer
 import time
 
 
-def save_tensor_openexr(file_path, data, dtype=np.float16):
+def save_tensor_openexr(file_path, data, dtype=np.float16, use_alpha=False):
     if dtype == np.float32:
         pt = Imath.PixelType(Imath.PixelType.FLOAT)
     elif dtype == np.float16:
@@ -49,12 +49,21 @@ def save_tensor_openexr(file_path, data, dtype=np.float16):
     if data.dtype != dtype:
         data = data.astype(dtype)
     header = OpenEXR.Header(data.shape[2], data.shape[1])
-    header['channels'] = {'R': Imath.Channel(pt), 'G': Imath.Channel(pt), 'B': Imath.Channel(pt)}
+    if use_alpha:
+        header['channels'] = {
+            'R': Imath.Channel(pt), 'G': Imath.Channel(pt), 'B': Imath.Channel(pt), 'A': Imath.Channel(pt)
+        }
+    else:
+        header['channels'] = {'R': Imath.Channel(pt), 'G': Imath.Channel(pt), 'B': Imath.Channel(pt)}
     out = OpenEXR.OutputFile(file_path, header)
     reds = data[0, :, :].tobytes()
     greens = data[1, :, :].tobytes()
     blues = data[2, :, :].tobytes()
-    out.writePixels({'R': reds, 'G': greens, 'B': blues})
+    if use_alpha:
+        alphas = data[3, :, :].tobytes()
+        out.writePixels({'R': reds, 'G': greens, 'B': blues, 'A': alphas})
+    else:
+        out.writePixels({'R': reds, 'G': greens, 'B': blues})
 
 
 def save_camera_config(file_path, view_matrix):
@@ -192,26 +201,38 @@ if __name__ == '__main__':
     vpt_renderer.module().set_iso_value(0.3)
     vpt_renderer.module().set_surface_brdf('Lambertian')
     #vpt_renderer.module().set_surface_brdf('Blinn Phong')
+    vpt_renderer.module().set_use_feature_maps(["Cloud Only", "Background"])
 
     vpt_renderer.module().set_camera_position([0.0, 0.0, 0.3])
     vpt_renderer.module().set_camera_target([0.0, 0.0, 0.0])
 
     start = time.time()
 
-    for i in range(16):
+    for i in range(2):
         #view_matrix = sample_view_matrix_circle(aabb)
         view_matrix_array, vm, ivm = sample_view_matrix_box(aabb)
         vpt_renderer.module().overwrite_camera_view_matrix(view_matrix_array)
-        vpt_test_tensor_cuda = vpt_renderer(test_tensor_cuda)
+        #torch.cuda.synchronize()
 
         img_name = f'img_{i}.exr'
+        vpt_test_tensor_cuda = vpt_renderer(test_tensor_cuda)
         save_tensor_openexr(f'out/{img_name}', vpt_test_tensor_cuda.cpu().numpy())
+
+        fg_name = f'fg_{i}.exr'
+        image_cloud_only = vpt_renderer.module().get_feature_map_from_string(test_tensor_cuda, "Cloud Only")
+        save_tensor_openexr(f'out/{fg_name}', image_cloud_only.cpu().numpy(), use_alpha=True)
+
+        bg_name = f'bg_{i}.exr'
+        image_background = vpt_renderer.module().get_feature_map_from_string(test_tensor_cuda, "Background")
+        save_tensor_openexr(f'out/{bg_name}', image_background.cpu().numpy())
         #save_camera_config(f'out/intrinsics_{i}.txt', vpt_renderer.module().get_camera_view_matrix())
 
         #vm = vpt_renderer.module().get_camera_view_matrix()
         camera_info = dict()
         camera_info['id'] = i
         camera_info['img_name'] = img_name
+        camera_info['fg_name'] = fg_name
+        camera_info['bg_name'] = bg_name
         camera_info['width'] = image_width
         camera_info['height'] = image_height
         camera_info['position'] = [ivm[i, 3] for i in range(0, 3)]
