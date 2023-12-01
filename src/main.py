@@ -113,7 +113,7 @@ def sample_view_matrix_circle(aabb):
     for i in range(4):
         for j in range(4):
             view_matrix_array[i * 4 + j] = view_matrix[j, i]
-    return view_matrix_array
+    return view_matrix_array, view_matrix, inverse_view_matrix
 
 
 def sample_view_matrix_box(aabb):
@@ -138,7 +138,7 @@ def sample_view_matrix_box(aabb):
     for i in range(4):
         for j in range(4):
             view_matrix_array[i * 4 + j] = view_matrix[j, i]
-    return view_matrix_array
+    return view_matrix_array, view_matrix, inverse_view_matrix
 
 
 if __name__ == '__main__':
@@ -196,26 +196,32 @@ if __name__ == '__main__':
     vpt_renderer.module().set_camera_position([0.0, 0.0, 0.3])
     vpt_renderer.module().set_camera_target([0.0, 0.0, 0.0])
 
+    start = time.time()
+
     for i in range(16):
         #view_matrix = sample_view_matrix_circle(aabb)
-        view_matrix = sample_view_matrix_box(aabb)
-        vpt_renderer.module().overwrite_camera_view_matrix(view_matrix)
+        view_matrix_array, vm, ivm = sample_view_matrix_box(aabb)
+        vpt_renderer.module().overwrite_camera_view_matrix(view_matrix_array)
         vpt_test_tensor_cuda = vpt_renderer(test_tensor_cuda)
 
         img_name = f'img_{i}.exr'
         save_tensor_openexr(f'out/{img_name}', vpt_test_tensor_cuda.cpu().numpy())
         #save_camera_config(f'out/intrinsics_{i}.txt', vpt_renderer.module().get_camera_view_matrix())
 
-        vm = vpt_renderer.module().get_camera_view_matrix()
+        #vm = vpt_renderer.module().get_camera_view_matrix()
         camera_info = dict()
         camera_info['id'] = i
         camera_info['img_name'] = img_name
         camera_info['width'] = image_width
         camera_info['height'] = image_height
-        camera_info['position'] = [vm[i] for i in range(12, 15)]
+        camera_info['position'] = [ivm[i, 3] for i in range(0, 3)]
         camera_info['rotation'] = [
-            [vm[i] for i in range(0, 3)], [vm[i] for i in range(4, 7)], [vm[i] for i in range(8, 11)]
+            [ivm[i, 0] for i in range(0, 3)], [ivm[i, 1] for i in range(0, 3)], [ivm[i, 2] for i in range(0, 3)]
         ]
+        #camera_info['view_matrix'] = [
+        #    [vm[i] for i in range(0, 4)], [vm[i] for i in range(4, 8)],
+        #    [vm[i] for i in range(8, 12)], [vm[i] for i in range(12, 16)]
+        #]
         camera_info['fovy'] = vpt_renderer.module().get_camera_fovy()
         camera_infos.append(camera_info)
 
@@ -229,6 +235,9 @@ if __name__ == '__main__':
             plt.imshow(vpt_test_tensor_cuda.cpu().permute(1, 2, 0))
             plt.show()
             break
+
+    end = time.time()
+    print(f'Elapsed time: {end - start}s')
 
     with open('out/cameras.json', 'w') as f:
         json.dump(camera_infos, f, ensure_ascii=False, indent=4)
