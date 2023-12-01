@@ -169,7 +169,7 @@ if __name__ == '__main__':
     vpt_renderer = VolumetricPathTracingRenderer()
     render_module = vpt_renderer.module()
 
-    #pathlib.Path('out').mkdir(exist_ok=True)
+    pathlib.Path('out').mkdir(exist_ok=True)
     #with open('out/extrinsics.txt', 'w') as f:
     #    f.write(f'{vpt_renderer.module().get_camera_fovy()}')
     aabb = vpt_renderer.module().get_render_bounding_box()
