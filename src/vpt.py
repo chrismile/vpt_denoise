@@ -37,6 +37,7 @@ class VolumetricPathTracingRenderer(object):
     """
 
     def __init__(self):
+        self.num_frames = 16
         if not is_module_loaded('vpt'):
             load_module('vpt')
             torch.ops.vpt.initialize()
@@ -49,12 +50,16 @@ class VolumetricPathTracingRenderer(object):
     def __del__(self):
         self.cleanup()
 
+    def set_num_frames(num_frames):
+        self.num_frames = num_frames
+
     def __call__(self, input_tensor):
         #if importance_sampling_mask is not None:
         #    color_image_relit = torch.ops.sh_aug.render_frame(input_tensor)
         #else:
         #    color_image_relit = torch.ops.sh_aug.render_frame(input_tensor)
-        color_image_relit = torch.ops.vpt.render_frame(input_tensor, 16384)
+        #color_image_relit = torch.ops.vpt.render_frame(input_tensor, 16384)
+        color_image_relit = torch.ops.vpt.render_frame(input_tensor, self.num_frames)
         return color_image_relit
 
     def module(self):

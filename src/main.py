@@ -195,7 +195,14 @@ if __name__ == '__main__':
     vpt_renderer.module().set_use_transfer_function(True)
     vpt_renderer.module().load_transfer_function_file(
         str(pathlib.Path.home()) + '/Programming/C++/CloudRendering/Data/TransferFunctions/TF_Wholebody3.xml')
-    vpt_renderer.module().set_vpt_mode_from_name('Delta Tracking')
+    #mode = 'Delta Tracking'
+    mode = 'Isosurfaces'
+    if mode == 'Delta Tracking':
+        vpt_renderer.set_num_frames(16384)
+    elif mode == 'Isosurfaces':
+        vpt_renderer.set_num_frames(256)
+    #vpt_renderer.module().set_vpt_mode_from_name('Delta Tracking')
+    vpt_renderer.module().set_vpt_mode_from_name(mode)
     vpt_renderer.module().set_use_isosurfaces(True)
     #vpt_renderer.module().set_iso_value(0.360)
     vpt_renderer.module().set_iso_value(0.3)
@@ -208,7 +215,7 @@ if __name__ == '__main__':
 
     start = time.time()
 
-    for i in range(2):
+    for i in range(16):
         #view_matrix = sample_view_matrix_circle(aabb)
         view_matrix_array, vm, ivm = sample_view_matrix_box(aabb)
         vpt_renderer.module().overwrite_camera_view_matrix(view_matrix_array)
