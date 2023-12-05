@@ -127,12 +127,40 @@ def sample_view_matrix_circle(aabb):
 
 def sample_view_matrix_box(aabb):
     global_up = np.array([0.0, 1.0, 0.0])
+    rx = 0.5 * (aabb[1] - aabb[0])
+    ry = 0.5 * (aabb[3] - aabb[2])
+    rz = 0.5 * (aabb[5] - aabb[4])
+    radii_sorted = sorted([rx, ry, rz])
+    r_base = np.sqrt(radii_sorted[0] ** 2 + radii_sorted[1] ** 2)
+    r = random.uniform(r_base, r_base * 2.0)
+    h = radii_sorted[2]
+    hi = 0 if rx >= ry and rx >= rz else (ry if ry >= rz else rz)
+    r0i = 0 if hi != 0 else 1
+    r1i = 2 if hi != 2 else 1
+    area_sphere = 4 * (r**2) * np.pi
+    area_cylinder = 2 * np.pi * r * h
+    area_total = area_sphere + area_cylinder
+    pos_rand = random.random() * area_total
     theta = 2.0 * np.pi * random.random()
-    phi = np.arccos(1.0 - 2.0 * random.random())
-    r_total = 0.5 * vec_length(np.array([aabb[1] - aabb[0], aabb[3] - aabb[2], aabb[5] - aabb[4]]))
-    r = random.uniform(r_total / 16.0, r_total / 2.0)
-    camera_position = np.array([r * np.sin(phi) * np.cos(theta), r * np.sin(phi) * np.sin(theta), r * np.cos(phi)])
-    camera_forward = vec_normalize(camera_position)
+    camera_position = np.zeros(3)
+    if pos_rand < area_cylinder:
+        h_pos = random.random() * h
+        camera_position[r0i] = r * np.cos(theta)
+        camera_position[r1i] = r * np.sin(theta)
+        camera_forward = vec_normalize(camera_position)
+        camera_position[hi] = h_pos
+    else:
+        phi = np.arccos(1.0 - 2.0 * random.random())
+        #camera_position = np.array([r * np.sin(phi) * np.cos(theta), r * np.sin(phi) * np.sin(theta), r * np.cos(phi)])
+        camera_position[r0i] = r * np.sin(phi) * np.cos(theta)
+        camera_position[r1i] = r * np.sin(phi) * np.sin(theta)
+        camera_position[hi] = r * np.cos(phi)
+        camera_forward = vec_normalize(camera_position)
+        if phi > 0.0:
+            camera_position[hi] += h
+    camera_position[0] += aabb[0]
+    camera_position[1] += aabb[2]
+    camera_position[2] += aabb[4]
     camera_right = vec_normalize(vec_cross(global_up, camera_forward))
     camera_up = vec_normalize(vec_cross(camera_forward, camera_right))
     rotation_matrix = np.empty((4, 4))
@@ -213,11 +241,19 @@ if __name__ == '__main__':
     vpt_renderer.module().set_camera_position([0.0, 0.0, 0.3])
     vpt_renderer.module().set_camera_target([0.0, 0.0, 0.0])
 
+    rx = 0.5 * (aabb[1] - aabb[0])
+    ry = 0.5 * (aabb[3] - aabb[2])
+    rz = 0.5 * (aabb[5] - aabb[4])
+    radii_sorted = sorted([rx, ry, rz])
+    is_spherical = radii_sorted[2] - radii_sorted[0] < 0.01
+
     start = time.time()
 
     for i in range(16):
-        #view_matrix = sample_view_matrix_circle(aabb)
-        view_matrix_array, vm, ivm = sample_view_matrix_box(aabb)
+        if is_spherical:
+            view_matrix_array, vm, ivm = sample_view_matrix_circle(aabb)
+        else:
+            view_matrix_array, vm, ivm = sample_view_matrix_box(aabb)
         vpt_renderer.module().overwrite_camera_view_matrix(view_matrix_array)
         #torch.cuda.synchronize()
 
