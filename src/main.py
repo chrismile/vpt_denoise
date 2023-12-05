@@ -132,9 +132,9 @@ def sample_view_matrix_box(aabb):
     rz = 0.5 * (aabb[5] - aabb[4])
     radii_sorted = sorted([rx, ry, rz])
     r_base = np.sqrt(radii_sorted[0] ** 2 + radii_sorted[1] ** 2)
-    r = random.uniform(r_base, r_base * 2.0)
+    r = random.uniform(1.5 * r_base, r_base * 3.0)
     h = radii_sorted[2]
-    hi = 0 if rx >= ry and rx >= rz else (ry if ry >= rz else rz)
+    hi = 0 if rx >= ry and rx >= rz else (1 if ry >= rz else 2)
     r0i = 0 if hi != 0 else 1
     r1i = 2 if hi != 2 else 1
     area_sphere = 4 * (r**2) * np.pi
@@ -156,7 +156,7 @@ def sample_view_matrix_box(aabb):
         camera_position[r1i] = r * np.sin(phi) * np.sin(theta)
         camera_position[hi] = r * np.cos(phi)
         camera_forward = vec_normalize(camera_position)
-        if phi > 0.0:
+        if np.cos(phi) > 0.0:
             camera_position[hi] += h
     camera_position[0] += aabb[0]
     camera_position[1] += aabb[2]
@@ -209,7 +209,6 @@ if __name__ == '__main__':
     pathlib.Path('out').mkdir(exist_ok=True)
     #with open('out/extrinsics.txt', 'w') as f:
     #    f.write(f'{vpt_renderer.module().get_camera_fovy()}')
-    aabb = vpt_renderer.module().get_render_bounding_box()
     camera_infos = []
 
     data_dir = '/mnt/data/Flow/Scalar/'
@@ -228,7 +227,7 @@ if __name__ == '__main__':
     if mode == 'Delta Tracking':
         vpt_renderer.set_num_frames(16384)
     elif mode == 'Isosurfaces':
-        vpt_renderer.set_num_frames(256)
+        vpt_renderer.set_num_frames(4)  # 256
     #vpt_renderer.module().set_vpt_mode_from_name('Delta Tracking')
     vpt_renderer.module().set_vpt_mode_from_name(mode)
     vpt_renderer.module().set_use_isosurfaces(True)
@@ -241,6 +240,7 @@ if __name__ == '__main__':
     vpt_renderer.module().set_camera_position([0.0, 0.0, 0.3])
     vpt_renderer.module().set_camera_target([0.0, 0.0, 0.0])
 
+    aabb = vpt_renderer.module().get_render_bounding_box()
     rx = 0.5 * (aabb[1] - aabb[0])
     ry = 0.5 * (aabb[3] - aabb[2])
     rz = 0.5 * (aabb[5] - aabb[4])
