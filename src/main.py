@@ -144,7 +144,7 @@ def sample_view_matrix_box(aabb):
     theta = 2.0 * np.pi * random.random()
     camera_position = np.zeros(3)
     if pos_rand < area_cylinder:
-        h_pos = random.random() * h
+        h_pos = (random.random() - 0.5) * h
         camera_position[r0i] = r * np.cos(theta)
         camera_position[r1i] = r * np.sin(theta)
         camera_forward = vec_normalize(camera_position)
@@ -157,10 +157,12 @@ def sample_view_matrix_box(aabb):
         camera_position[hi] = r * np.cos(phi)
         camera_forward = vec_normalize(camera_position)
         if np.cos(phi) > 0.0:
-            camera_position[hi] += h
-    camera_position[0] += aabb[0]
-    camera_position[1] += aabb[2]
-    camera_position[2] += aabb[4]
+            camera_position[hi] += h / 2
+        else:
+            camera_position[hi] -= h / 2
+    #camera_position[0] += aabb[0]
+    #camera_position[1] += aabb[2]
+    #camera_position[2] += aabb[4]
     camera_right = vec_normalize(vec_cross(global_up, camera_forward))
     camera_up = vec_normalize(vec_cross(camera_forward, camera_right))
     rotation_matrix = np.empty((4, 4))
@@ -227,7 +229,7 @@ if __name__ == '__main__':
     if mode == 'Delta Tracking':
         vpt_renderer.set_num_frames(16384)
     elif mode == 'Isosurfaces':
-        vpt_renderer.set_num_frames(4)  # 256
+        vpt_renderer.set_num_frames(256)  # 256
     #vpt_renderer.module().set_vpt_mode_from_name('Delta Tracking')
     vpt_renderer.module().set_vpt_mode_from_name(mode)
     vpt_renderer.module().set_use_isosurfaces(True)
@@ -249,7 +251,7 @@ if __name__ == '__main__':
 
     start = time.time()
 
-    for i in range(16):
+    for i in range(200):
         if is_spherical:
             view_matrix_array, vm, ivm = sample_view_matrix_circle(aabb)
         else:
