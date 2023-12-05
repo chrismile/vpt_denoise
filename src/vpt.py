@@ -50,7 +50,7 @@ class VolumetricPathTracingRenderer(object):
     def __del__(self):
         self.cleanup()
 
-    def set_num_frames(num_frames):
+    def set_num_frames(self, num_frames):
         self.num_frames = num_frames
 
     def __call__(self, input_tensor):
