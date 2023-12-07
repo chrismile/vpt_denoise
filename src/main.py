@@ -133,7 +133,7 @@ def sample_view_matrix_box(aabb):
     radii_sorted = sorted([rx, ry, rz])
     r_base = np.sqrt(radii_sorted[0] ** 2 + radii_sorted[1] ** 2)
     r = random.uniform(1.5 * r_base, r_base * 3.0)
-    h = radii_sorted[2]
+    h = 2 * radii_sorted[2]
     hi = 0 if rx >= ry and rx >= rz else (1 if ry >= rz else 2)
     r0i = 0 if hi != 0 else 1
     r1i = 2 if hi != 2 else 1
@@ -224,17 +224,30 @@ if __name__ == '__main__':
     vpt_renderer.module().set_use_transfer_function(True)
     vpt_renderer.module().load_transfer_function_file(
         str(pathlib.Path.home()) + '/Programming/C++/CloudRendering/Data/TransferFunctions/TF_Wholebody3.xml')
+
+    denoiser_name = 'None'
+    #denoiser_name = 'OptiX Denoiser'
+    if denoiser_name != 'None':
+        vpt_renderer.module().set_denoiser(denoiser_name)
+
     #mode = 'Delta Tracking'
-    mode = 'Isosurfaces'
-    if mode == 'Delta Tracking':
-        vpt_renderer.set_num_frames(16384)
-    elif mode == 'Isosurfaces':
-        vpt_renderer.set_num_frames(256)  # 256
+    mode = 'Next Event Tracking'
+    #mode = 'Isosurfaces'
+    if denoiser_name == 'None':
+        if mode == 'Delta Tracking':
+            vpt_renderer.set_num_frames(16384)
+        elif mode == 'Next Event Tracking':
+            vpt_renderer.set_num_frames(1024)
+        elif mode == 'Isosurfaces':
+            vpt_renderer.set_num_frames(256)
+    else:
+        vpt_renderer.set_num_frames(2)
     #vpt_renderer.module().set_vpt_mode_from_name('Delta Tracking')
     vpt_renderer.module().set_vpt_mode_from_name(mode)
     vpt_renderer.module().set_use_isosurfaces(True)
+    iso_value = 0.3
     #vpt_renderer.module().set_iso_value(0.360)
-    vpt_renderer.module().set_iso_value(0.3)
+    vpt_renderer.module().set_iso_value(iso_value)
     vpt_renderer.module().set_surface_brdf('Lambertian')
     #vpt_renderer.module().set_surface_brdf('Blinn Phong')
     vpt_renderer.module().set_use_feature_maps(["Cloud Only", "Background"])
@@ -251,7 +264,9 @@ if __name__ == '__main__':
 
     start = time.time()
 
-    for i in range(200):
+    num_frames = 200
+    #num_frames = 1
+    for i in range(num_frames):
         if is_spherical:
             view_matrix_array, vm, ivm = sample_view_matrix_circle(aabb)
         else:
@@ -289,7 +304,10 @@ if __name__ == '__main__':
         #    [vm[i] for i in range(8, 12)], [vm[i] for i in range(12, 16)]
         #]
         camera_info['fovy'] = vpt_renderer.module().get_camera_fovy()
+        camera_info['aabb'] = aabb
+        camera_info['iso'] = iso_value
         camera_infos.append(camera_info)
+        print(f'{i}/{num_frames}')
 
         if test_mode:
             #vpt_test_tensor_cpu = vpt_renderer(test_tensor_cpu)
