@@ -216,6 +216,8 @@ if __name__ == '__main__':
     data_dir = '/mnt/data/Flow/Scalar/'
     if not os.path.isdir(data_dir):
         data_dir = '/media/christoph/Elements/Datasets/Scalar/'
+    if not os.path.isdir(data_dir):
+        data_dir = '/home/christoph/datasets/Flow/Scalar/'
     vpt_renderer.module().load_volume_file(
         data_dir + 'Wholebody [512 512 3172] (CT)/wholebody.dat')
     vpt_renderer.module().load_environment_map(
@@ -237,7 +239,7 @@ if __name__ == '__main__':
         if mode == 'Delta Tracking':
             vpt_renderer.set_num_frames(16384)
         elif mode == 'Next Event Tracking':
-            vpt_renderer.set_num_frames(1024)
+            vpt_renderer.set_num_frames(256)
         elif mode == 'Isosurfaces':
             vpt_renderer.set_num_frames(256)
     else:
