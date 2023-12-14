@@ -251,6 +251,7 @@ if __name__ == '__main__':
     #vpt_renderer.module().set_iso_value(0.360)
     vpt_renderer.module().set_iso_value(iso_value)
     vpt_renderer.module().set_surface_brdf('Lambertian')
+    vpt_renderer.module().set_iso_surface_color([0.4, 0.4, 0.4])
     #vpt_renderer.module().set_surface_brdf('Blinn Phong')
     vpt_renderer.module().set_use_feature_maps(["Cloud Only", "Background"])
 
