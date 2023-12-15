@@ -227,33 +227,40 @@ if __name__ == '__main__':
     vpt_renderer.module().load_transfer_function_file(
         str(pathlib.Path.home()) + '/Programming/C++/CloudRendering/Data/TransferFunctions/TF_Wholebody3.xml')
 
-    denoiser_name = 'None'
-    #denoiser_name = 'OptiX Denoiser'
+    #denoiser_name = 'None'
+    denoiser_name = 'OptiX Denoiser'
     if denoiser_name != 'None':
         vpt_renderer.module().set_denoiser(denoiser_name)
 
     #mode = 'Delta Tracking'
     mode = 'Next Event Tracking'
     #mode = 'Isosurfaces'
-    if denoiser_name == 'None':
-        if mode == 'Delta Tracking':
-            vpt_renderer.set_num_frames(16384)
-        elif mode == 'Next Event Tracking':
-            vpt_renderer.set_num_frames(256)
-        elif mode == 'Isosurfaces':
-            vpt_renderer.set_num_frames(256)
-    else:
-        vpt_renderer.set_num_frames(2)
+    if mode == 'Delta Tracking':
+        vpt_renderer.set_num_frames(16384)
+    elif mode == 'Next Event Tracking':
+        vpt_renderer.set_num_frames(256)
+    elif mode == 'Isosurfaces':
+        vpt_renderer.set_num_frames(256)
+    #if denoiser_name == 'None':
+    #    if mode == 'Delta Tracking':
+    #        vpt_renderer.set_num_frames(16384)
+    #    elif mode == 'Next Event Tracking':
+    #        vpt_renderer.set_num_frames(256)
+    #    elif mode == 'Isosurfaces':
+    #        vpt_renderer.set_num_frames(256)
+    #else:
+    #    vpt_renderer.set_num_frames(2)
     #vpt_renderer.module().set_vpt_mode_from_name('Delta Tracking')
     vpt_renderer.module().set_vpt_mode_from_name(mode)
     vpt_renderer.module().set_use_isosurfaces(True)
     iso_value = 0.3
     #vpt_renderer.module().set_iso_value(0.360)
     vpt_renderer.module().set_iso_value(iso_value)
-    vpt_renderer.module().set_surface_brdf('Lambertian')
     vpt_renderer.module().set_iso_surface_color([0.4, 0.4, 0.4])
+    vpt_renderer.module().set_surface_brdf('Lambertian')
     #vpt_renderer.module().set_surface_brdf('Blinn Phong')
     vpt_renderer.module().set_use_feature_maps(["Cloud Only", "Background"])
+    vpt_renderer.module().set_output_foreground_map(True)
 
     vpt_renderer.module().set_camera_position([0.0, 0.0, 0.3])
     vpt_renderer.module().set_camera_target([0.0, 0.0, 0.0])
@@ -267,8 +274,8 @@ if __name__ == '__main__':
 
     start = time.time()
 
-    num_frames = 200
-    #num_frames = 1
+    #num_frames = 200
+    num_frames = 1
     for i in range(num_frames):
         if is_spherical:
             view_matrix_array, vm, ivm = sample_view_matrix_circle(aabb)
@@ -277,13 +284,17 @@ if __name__ == '__main__':
         vpt_renderer.module().overwrite_camera_view_matrix(view_matrix_array)
         #torch.cuda.synchronize()
 
-        img_name = f'img_{i}.exr'
-        vpt_test_tensor_cuda = vpt_renderer(test_tensor_cuda)
-        save_tensor_openexr(f'out/{img_name}', vpt_test_tensor_cuda.cpu().numpy())
+        #img_name = f'img_{i}.exr'
+        #vpt_test_tensor_cuda = vpt_renderer(test_tensor_cuda)
+        #save_tensor_openexr(f'out/{img_name}', vpt_test_tensor_cuda.cpu().numpy())
+
+        #fg_name = f'fg_{i}.exr'
+        #image_cloud_only = vpt_renderer.module().get_feature_map_from_string(test_tensor_cuda, "Cloud Only")
+        #save_tensor_openexr(f'out/{fg_name}', image_cloud_only.cpu().numpy(), use_alpha=True)
 
         fg_name = f'fg_{i}.exr'
-        image_cloud_only = vpt_renderer.module().get_feature_map_from_string(test_tensor_cuda, "Cloud Only")
-        save_tensor_openexr(f'out/{fg_name}', image_cloud_only.cpu().numpy(), use_alpha=True)
+        vpt_test_tensor_cuda = vpt_renderer(test_tensor_cuda)
+        save_tensor_openexr(f'out/{fg_name}', vpt_test_tensor_cuda.cpu().numpy(), use_alpha=True)
 
         bg_name = f'bg_{i}.exr'
         image_background = vpt_renderer.module().get_feature_map_from_string(test_tensor_cuda, "Background")
@@ -293,7 +304,7 @@ if __name__ == '__main__':
         #vm = vpt_renderer.module().get_camera_view_matrix()
         camera_info = dict()
         camera_info['id'] = i
-        camera_info['img_name'] = img_name
+        #camera_info['img_name'] = img_name
         camera_info['fg_name'] = fg_name
         camera_info['bg_name'] = bg_name
         camera_info['width'] = image_width
