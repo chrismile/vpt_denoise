@@ -274,8 +274,8 @@ if __name__ == '__main__':
 
     start = time.time()
 
-    #num_frames = 200
-    num_frames = 1
+    num_frames = 200
+    #num_frames = 1
     for i in range(num_frames):
         if is_spherical:
             view_matrix_array, vm, ivm = sample_view_matrix_circle(aabb)
