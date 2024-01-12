@@ -259,7 +259,7 @@ if __name__ == '__main__':
     vpt_renderer.module().set_iso_surface_color([0.4, 0.4, 0.4])
     vpt_renderer.module().set_surface_brdf('Lambertian')
     #vpt_renderer.module().set_surface_brdf('Blinn Phong')
-    vpt_renderer.module().set_use_feature_maps(["Cloud Only", "Background"])
+    vpt_renderer.module().set_use_feature_maps(["Cloud Only", "Background", "Depth Blended"])
     vpt_renderer.module().set_output_foreground_map(True)
 
     vpt_renderer.module().set_camera_position([0.0, 0.0, 0.3])
@@ -274,7 +274,7 @@ if __name__ == '__main__':
 
     start = time.time()
 
-    num_frames = 200
+    num_frames = 256
     #num_frames = 1
     for i in range(num_frames):
         if is_spherical:
@@ -300,6 +300,12 @@ if __name__ == '__main__':
         image_background = vpt_renderer.module().get_feature_map_from_string(test_tensor_cuda, "Background")
         save_tensor_openexr(f'out/{bg_name}', image_background.cpu().numpy())
         #save_camera_config(f'out/intrinsics_{i}.txt', vpt_renderer.module().get_camera_view_matrix())
+
+        depth_name = f'depth_{i}.exr'
+        image_depth = vpt_renderer.module().get_feature_map_from_string(test_tensor_cuda, "Depth Blended")
+        #mask = image_depth[1, :, :] > 1e-5
+        #image_depth[0, mask] /= image_depth[1, mask]
+        save_tensor_openexr(f'out/{depth_name}', image_depth.cpu().numpy())
 
         #vm = vpt_renderer.module().get_camera_view_matrix()
         camera_info = dict()
