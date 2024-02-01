@@ -15,7 +15,7 @@ Please use `-DCMAKE_INSTALL_PREFIX=<path>` to install the Python module in the t
 (2) Create a new environment with conda.
 
 (3a) Windows: Install PyTorch (https://pytorch.org/get-started/locally/), e.g.:
-```
+```shell
 conda install pytorch torchvision torchaudio pytorch-cuda=12.1 -c pytorch -c nvidia
 ```
 
@@ -26,8 +26,14 @@ The PyTorch packages provided via conda and pip do not use the CXX11 ABI of GCC,
 
 (5) Clone (and optionally fork) the code in this repo: https://github.com/chrismile/vpt_denoise
 
-(6) Edit the `build.bat` (Windows) or `build.sh` (Linux) script, and add to the cmake arguments when the CloudRenderer
-build is configured (please adapt the paths to where conda/the Python code lie):
+(6a)  Windows: Edit the `build.bat` script, and add to the cmake arguments when the CloudRenderer build is configured
+(please adapt the paths to where conda/the Python code lie):
 ```
 -DCMAKE_PREFIX_PATH=~/miniconda3/envs/vpt/lib/python3.10/site-packages/torch/share/cmake -DBUILD_PYTORCH_MODULE=On -DSUPPORT_PYTORCH_DENOISER=On -DBUILD_KPN_MODULE=On -DCMAKE_INSTALL_PREFIX=~/Programming/DL/vpt_denoise
+```
+Additionally, `cmake --build .build --target install` needs to be added to install the module after building the application.
+
+(6b) Linux: Call `build.sh` as follows:
+```shell
+./build.sh --use-pytorch --install-dir /path/to/vpt_denoise
 ```
