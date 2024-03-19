@@ -26,6 +26,7 @@
 
 import os
 import random
+import datetime
 import json
 import pathlib
 import matplotlib.pyplot as plt
@@ -132,7 +133,10 @@ def sample_view_matrix_box(aabb):
     rz = 0.5 * (aabb[5] - aabb[4])
     radii_sorted = sorted([rx, ry, rz])
     r_base = np.sqrt(radii_sorted[0] ** 2 + radii_sorted[1] ** 2)
-    r = random.uniform(1.5 * r_base, r_base * 3.0)
+    if random.randint(0, 1) == 0:
+        r = random.uniform(1.5 * r_base, r_base * 3.0)
+    else:
+        r = random.uniform(0.5 * r_base, r_base * 1.5)  # TODO
     h = 2 * radii_sorted[2]
     hi = 0 if rx >= ry and rx >= rz else (1 if ry >= rz else 2)
     r0i = 0 if hi != 0 else 1
@@ -208,8 +212,9 @@ if __name__ == '__main__':
     vpt_renderer = VolumetricPathTracingRenderer()
     render_module = vpt_renderer.module()
 
-    pathlib.Path('out').mkdir(exist_ok=True)
-    #with open('out/extrinsics.txt', 'w') as f:
+    out_dir = f'out_{datetime.datetime.now():%Y-%m-%d_%H:%M:%S}'
+    pathlib.Path(out_dir).mkdir(exist_ok=True)
+    #with open(f'{out_dir}/extrinsics.txt', 'w') as f:
     #    f.write(f'{vpt_renderer.module().get_camera_fovy()}')
     camera_infos = []
 
@@ -226,6 +231,8 @@ if __name__ == '__main__':
     vpt_renderer.module().set_use_transfer_function(True)
     vpt_renderer.module().load_transfer_function_file(
         str(pathlib.Path.home()) + '/Programming/C++/CloudRendering/Data/TransferFunctions/TF_Wholebody3.xml')
+    vpt_renderer.module().load_transfer_function_file_gradient(
+        str(pathlib.Path.home()) + '/Programming/C++/CloudRendering/Data/TransferFunctions/TF_WholebodyGrad1.xml')
 
     #denoiser_name = 'None'
     denoiser_name = 'OptiX Denoiser'
@@ -253,8 +260,13 @@ if __name__ == '__main__':
     #vpt_renderer.module().set_vpt_mode_from_name('Delta Tracking')
     vpt_renderer.module().set_vpt_mode_from_name(mode)
     vpt_renderer.module().set_use_isosurfaces(True)
-    iso_value = 0.3
-    #vpt_renderer.module().set_iso_value(0.360)
+    use_gradient_mode = True
+    if use_gradient_mode:
+        vpt_renderer.module().set_isosurface_type('Gradient')
+        iso_value = 0.002
+    else:
+        vpt_renderer.module().set_isosurface_type('Density')
+        iso_value = 0.3
     vpt_renderer.module().set_iso_value(iso_value)
     vpt_renderer.module().set_iso_surface_color([0.4, 0.4, 0.4])
     vpt_renderer.module().set_surface_brdf('Lambertian')
@@ -286,26 +298,26 @@ if __name__ == '__main__':
 
         #img_name = f'img_{i}.exr'
         #vpt_test_tensor_cuda = vpt_renderer(test_tensor_cuda)
-        #save_tensor_openexr(f'out/{img_name}', vpt_test_tensor_cuda.cpu().numpy())
+        #save_tensor_openexr(f'{out_dir}/{img_name}', vpt_test_tensor_cuda.cpu().numpy())
 
         #fg_name = f'fg_{i}.exr'
         #image_cloud_only = vpt_renderer.module().get_feature_map_from_string(test_tensor_cuda, "Cloud Only")
-        #save_tensor_openexr(f'out/{fg_name}', image_cloud_only.cpu().numpy(), use_alpha=True)
+        #save_tensor_openexr(f'{out_dir}/{fg_name}', image_cloud_only.cpu().numpy(), use_alpha=True)
 
         fg_name = f'fg_{i}.exr'
         vpt_test_tensor_cuda = vpt_renderer(test_tensor_cuda)
-        save_tensor_openexr(f'out/{fg_name}', vpt_test_tensor_cuda.cpu().numpy(), use_alpha=True)
+        save_tensor_openexr(f'{out_dir}/{fg_name}', vpt_test_tensor_cuda.cpu().numpy(), use_alpha=True)
 
         bg_name = f'bg_{i}.exr'
         image_background = vpt_renderer.module().get_feature_map_from_string(test_tensor_cuda, "Background")
-        save_tensor_openexr(f'out/{bg_name}', image_background.cpu().numpy())
-        #save_camera_config(f'out/intrinsics_{i}.txt', vpt_renderer.module().get_camera_view_matrix())
+        save_tensor_openexr(f'{out_dir}/{bg_name}', image_background.cpu().numpy())
+        #save_camera_config(f'{out_dir}/intrinsics_{i}.txt', vpt_renderer.module().get_camera_view_matrix())
 
         depth_name = f'depth_{i}.exr'
         image_depth = vpt_renderer.module().get_feature_map_from_string(test_tensor_cuda, "Depth Blended")
         #mask = image_depth[1, :, :] > 1e-5
         #image_depth[0, mask] /= image_depth[1, mask]
-        save_tensor_openexr(f'out/{depth_name}', image_depth.cpu().numpy())
+        save_tensor_openexr(f'{out_dir}/{depth_name}', image_depth.cpu().numpy())
 
         #vm = vpt_renderer.module().get_camera_view_matrix()
         camera_info = dict()
@@ -343,7 +355,7 @@ if __name__ == '__main__':
     end = time.time()
     print(f'Elapsed time: {end - start}s')
 
-    with open('out/cameras.json', 'w') as f:
+    with open(f'{out_dir}/cameras.json', 'w') as f:
         json.dump(camera_infos, f, ensure_ascii=False, indent=4)
 
     del vpt_renderer
