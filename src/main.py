@@ -242,12 +242,14 @@ if __name__ == '__main__':
     #mode = 'Delta Tracking'
     mode = 'Next Event Tracking'
     #mode = 'Isosurfaces'
+    num_frames = 256
     if mode == 'Delta Tracking':
-        vpt_renderer.set_num_frames(16384)
+        num_frames = 16384
     elif mode == 'Next Event Tracking':
-        vpt_renderer.set_num_frames(256)
+        num_frames = 256
     elif mode == 'Isosurfaces':
-        vpt_renderer.set_num_frames(256)
+        num_frames = 256
+    vpt_renderer.set_num_frames(num_frames)
     #if denoiser_name == 'None':
     #    if mode == 'Delta Tracking':
     #        vpt_renderer.set_num_frames(16384)
@@ -271,7 +273,8 @@ if __name__ == '__main__':
     vpt_renderer.module().set_iso_surface_color([0.4, 0.4, 0.4])
     vpt_renderer.module().set_surface_brdf('Lambertian')
     #vpt_renderer.module().set_surface_brdf('Blinn Phong')
-    vpt_renderer.module().set_use_feature_maps(["Cloud Only", "Background", "Depth Blended"])
+    used_feature_maps = ['Cloud Only', 'Background', 'Depth Blended']
+    vpt_renderer.module().set_use_feature_maps(used_feature_maps)
     vpt_renderer.module().set_output_foreground_map(True)
 
     vpt_renderer.module().set_camera_position([0.0, 0.0, 0.3])
@@ -286,14 +289,50 @@ if __name__ == '__main__':
 
     start = time.time()
 
-    num_frames = 256
+    use_visibility_aware_sampling = True
+    num_sampled_test_views = 32
+    volume_voxel_size = vpt_renderer.module().get_volume_voxel_size()
+    vis = None
+    gains = None
+    if use_visibility_aware_sampling:
+        vis = torch.zeros(
+            size=(volume_voxel_size[0], volume_voxel_size[1], volume_voxel_size[2]),
+            dtype=torch.float32, device=cuda_device)
+        gains = torch.zeros(num_sampled_test_views, device=cpu_device)
+
+    num_frames = 2
     #num_frames = 1
     for i in range(num_frames):
-        if is_spherical:
-            view_matrix_array, vm, ivm = sample_view_matrix_circle(aabb)
+        if use_visibility_aware_sampling:
+            vpt_renderer.set_num_frames(1)
+            vpt_renderer.module().set_use_feature_maps(['Transmittance Volume'])
+            tested_matrices = []
+            for view_idx in range(num_sampled_test_views):
+                if is_spherical:
+                    view_matrix_array, vm, ivm = sample_view_matrix_circle(aabb)
+                else:
+                    view_matrix_array, vm, ivm = sample_view_matrix_box(aabb)
+                vpt_renderer.module().overwrite_camera_view_matrix(view_matrix_array)
+                vpt_test_tensor_cuda = vpt_renderer(test_tensor_cuda)
+                transmittance_volume_tensor = vpt_renderer.module().get_transmittance_volume(test_tensor_cuda)
+                gains[view_idx] = ((vis + transmittance_volume_tensor).clamp(0, 1) - vis).sum().cpu()
+                tested_matrices.append((view_matrix_array, vm, ivm))
+            # Get the best view
+            idx = gains.argmax().item()
+            view_matrix_array, vm, ivm = tested_matrices[idx]
+            vpt_renderer.module().overwrite_camera_view_matrix(view_matrix_array)
+            vpt_test_tensor_cuda = vpt_renderer(test_tensor_cuda)
+            transmittance_volume_tensor = vpt_renderer.module().get_transmittance_volume(test_tensor_cuda)
+            vis = (vis + transmittance_volume_tensor).clamp(0, 1)
+            vpt_renderer.set_num_frames(num_frames)
+            vpt_renderer.module().set_use_feature_maps(used_feature_maps)
         else:
-            view_matrix_array, vm, ivm = sample_view_matrix_box(aabb)
-        vpt_renderer.module().overwrite_camera_view_matrix(view_matrix_array)
+            if is_spherical:
+                view_matrix_array, vm, ivm = sample_view_matrix_circle(aabb)
+            else:
+                view_matrix_array, vm, ivm = sample_view_matrix_box(aabb)
+            vpt_renderer.module().overwrite_camera_view_matrix(view_matrix_array)
+
         #torch.cuda.synchronize()
 
         #img_name = f'img_{i}.exr'
@@ -301,7 +340,7 @@ if __name__ == '__main__':
         #save_tensor_openexr(f'{out_dir}/{img_name}', vpt_test_tensor_cuda.cpu().numpy())
 
         #fg_name = f'fg_{i}.exr'
-        #image_cloud_only = vpt_renderer.module().get_feature_map_from_string(test_tensor_cuda, "Cloud Only")
+        #image_cloud_only = vpt_renderer.module().get_feature_map_from_string(test_tensor_cuda, 'Cloud Only')
         #save_tensor_openexr(f'{out_dir}/{fg_name}', image_cloud_only.cpu().numpy(), use_alpha=True)
 
         fg_name = f'fg_{i}.exr'
@@ -309,12 +348,12 @@ if __name__ == '__main__':
         save_tensor_openexr(f'{out_dir}/{fg_name}', vpt_test_tensor_cuda.cpu().numpy(), use_alpha=True)
 
         bg_name = f'bg_{i}.exr'
-        image_background = vpt_renderer.module().get_feature_map_from_string(test_tensor_cuda, "Background")
+        image_background = vpt_renderer.module().get_feature_map_from_string(test_tensor_cuda, 'Background')
         save_tensor_openexr(f'{out_dir}/{bg_name}', image_background.cpu().numpy())
         #save_camera_config(f'{out_dir}/intrinsics_{i}.txt', vpt_renderer.module().get_camera_view_matrix())
 
         depth_name = f'depth_{i}.exr'
-        image_depth = vpt_renderer.module().get_feature_map_from_string(test_tensor_cuda, "Depth Blended")
+        image_depth = vpt_renderer.module().get_feature_map_from_string(test_tensor_cuda, 'Depth Blended')
         #mask = image_depth[1, :, :] > 1e-5
         #image_depth[0, mask] /= image_depth[1, mask]
         save_tensor_openexr(f'{out_dir}/{depth_name}', image_depth.cpu().numpy())
