@@ -38,6 +38,20 @@ import Imath
 import array
 from vpt import VolumetricPathTracingRenderer
 import time
+#from netCDF4 import Dataset
+
+
+#def save_nc(file_path, data):
+#    zs = data.shape[0]
+#    ys = data.shape[1]
+#    xs = data.shape[2]
+#    ncfile = Dataset(file_path, mode='w', format='NETCDF4_CLASSIC')
+#    zdim = ncfile.createDimension('z', zs)
+#    ydim = ncfile.createDimension('y', ys)
+#    xdim = ncfile.createDimension('x', xs)
+#    outfield_den = ncfile.createVariable('density', np.float32, ('z', 'y', 'x'))
+#    outfield_den[:, :, :] = data[:, :, :]
+#    ncfile.close()
 
 
 def save_tensor_openexr(file_path, data, dtype=np.float16, use_alpha=False):
@@ -300,7 +314,7 @@ if __name__ == '__main__':
             dtype=torch.float32, device=cuda_device)
         gains = torch.zeros(num_sampled_test_views, device=cpu_device)
 
-    num_frames = 2
+    num_frames = 256
     #num_frames = 1
     for i in range(num_frames):
         if use_visibility_aware_sampling:
@@ -315,6 +329,8 @@ if __name__ == '__main__':
                 vpt_renderer.module().overwrite_camera_view_matrix(view_matrix_array)
                 vpt_test_tensor_cuda = vpt_renderer(test_tensor_cuda)
                 transmittance_volume_tensor = vpt_renderer.module().get_transmittance_volume(test_tensor_cuda)
+                #transmittance_array = transmittance_volume_tensor.cpu().numpy()
+                #save_nc('/home/christoph/datasets/Test/vis.nc', transmittance_array)
                 gains[view_idx] = ((vis + transmittance_volume_tensor).clamp(0, 1) - vis).sum().cpu()
                 tested_matrices.append((view_matrix_array, vm, ivm))
             # Get the best view
