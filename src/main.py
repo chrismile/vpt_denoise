@@ -262,7 +262,7 @@ if __name__ == '__main__':
     #vpt_renderer.module().set_vpt_mode_from_name('Delta Tracking')
     vpt_renderer.module().set_vpt_mode_from_name(mode)
     vpt_renderer.module().set_use_isosurfaces(True)
-    use_gradient_mode = True
+    use_gradient_mode = False
     if use_gradient_mode:
         vpt_renderer.module().set_isosurface_type('Gradient')
         iso_value = 0.002
