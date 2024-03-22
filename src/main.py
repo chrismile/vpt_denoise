@@ -198,6 +198,10 @@ def sample_view_matrix_box(aabb):
     return view_matrix_array, view_matrix, inverse_view_matrix
 
 
+def iceil(a, b):
+    return -(a // -b)
+
+
 if __name__ == '__main__':
     cuda_device_idx = 0
     vulkan_device_idx = 0
@@ -256,14 +260,14 @@ if __name__ == '__main__':
     #mode = 'Delta Tracking'
     mode = 'Next Event Tracking'
     #mode = 'Isosurfaces'
-    num_frames = 256
+    spp = 256
     if mode == 'Delta Tracking':
-        num_frames = 16384
+        spp = 16384
     elif mode == 'Next Event Tracking':
-        num_frames = 256
+        spp = 256
     elif mode == 'Isosurfaces':
-        num_frames = 256
-    vpt_renderer.set_num_frames(num_frames)
+        spp = 256
+    vpt_renderer.set_num_frames(spp)
     #if denoiser_name == 'None':
     #    if mode == 'Delta Tracking':
     #        vpt_renderer.set_num_frames(16384)
@@ -304,13 +308,18 @@ if __name__ == '__main__':
     start = time.time()
 
     use_visibility_aware_sampling = True
+    ds = 2
+    if use_visibility_aware_sampling:
+        vpt_renderer.module().set_secondary_volume_downscaling_factor(ds)
     num_sampled_test_views = 32
     volume_voxel_size = vpt_renderer.module().get_volume_voxel_size()
+    vis_volume_voxel_size = [iceil(x, ds) for x in volume_voxel_size]
     vis = None
     gains = None
     if use_visibility_aware_sampling:
+        vpt_renderer.set_num_frames(1)
         vis = torch.zeros(
-            size=(volume_voxel_size[0], volume_voxel_size[1], volume_voxel_size[2]),
+            size=(vis_volume_voxel_size[0], vis_volume_voxel_size[1], vis_volume_voxel_size[2]),
             dtype=torch.float32, device=cuda_device)
         gains = torch.zeros(num_sampled_test_views, device=cpu_device)
 
@@ -340,7 +349,7 @@ if __name__ == '__main__':
             vpt_test_tensor_cuda = vpt_renderer(test_tensor_cuda)
             transmittance_volume_tensor = vpt_renderer.module().get_transmittance_volume(test_tensor_cuda)
             vis = (vis + transmittance_volume_tensor).clamp(0, 1)
-            vpt_renderer.set_num_frames(num_frames)
+            vpt_renderer.set_num_frames(spp)
             vpt_renderer.module().set_use_feature_maps(used_feature_maps)
         else:
             if is_spherical:
