@@ -120,7 +120,8 @@ def sample_view_matrix_circle(aabb):
     theta = 2.0 * np.pi * random.random()
     phi = np.arccos(1.0 - 2.0 * random.random())
     r_total = 0.5 * vec_length(np.array([aabb[1] - aabb[0], aabb[3] - aabb[2], aabb[5] - aabb[4]]))
-    r = random.uniform(r_total / 16.0, r_total / 2.0)
+    #r = random.uniform(r_total / 16.0, r_total / 2.0)
+    r = random.uniform(r_total * 1.25, r_total * 1.75)
     camera_position = np.array([r * np.sin(phi) * np.cos(theta), r * np.sin(phi) * np.sin(theta), r * np.cos(phi)])
     camera_forward = vec_normalize(camera_position)
     camera_right = vec_normalize(vec_cross(global_up, camera_forward))
@@ -236,30 +237,53 @@ if __name__ == '__main__':
     #    f.write(f'{vpt_renderer.module().get_camera_fovy()}')
     camera_infos = []
 
+    #test_case = 'Wholebody'
+    #test_case = 'Angiography'
+    test_case = 'HeadDVR'
+
     data_dir = '/mnt/data/Flow/Scalar/'
     if not os.path.isdir(data_dir):
         data_dir = '/media/christoph/Elements/Datasets/Scalar/'
     if not os.path.isdir(data_dir):
         data_dir = '/home/christoph/datasets/Flow/Scalar/'
-    vpt_renderer.module().load_volume_file(
-        data_dir + 'Wholebody [512 512 3172] (CT)/wholebody.dat')
+    if test_case == 'Wholebody':
+        vpt_renderer.module().load_volume_file(
+            data_dir + 'Wholebody [512 512 3172] (CT)/wholebody.dat')
+    elif test_case == 'Angiography':
+        vpt_renderer.module().load_volume_file(
+            data_dir + 'Head [416 512 112] (MRT Angiography)/mrt8_angio.dat')
+    elif test_case == 'HeadDVR':
+        vpt_renderer.module().load_volume_file(
+            data_dir + 'Head [256 256 256] (MR)/Head_256x256x256.dat')
     vpt_renderer.module().load_environment_map(
         str(pathlib.Path.home())
         + '/Programming/C++/CloudRendering/Data/CloudDataSets/env_maps/small_empty_room_1_4k_blurred.exr')
     vpt_renderer.module().set_use_transfer_function(True)
-    vpt_renderer.module().load_transfer_function_file(
-        str(pathlib.Path.home()) + '/Programming/C++/CloudRendering/Data/TransferFunctions/TF_Wholebody3.xml')
-    vpt_renderer.module().load_transfer_function_file_gradient(
-        str(pathlib.Path.home()) + '/Programming/C++/CloudRendering/Data/TransferFunctions/TF_WholebodyGrad1.xml')
-
-    #denoiser_name = 'None'
-    denoiser_name = 'OptiX Denoiser'
-    if denoiser_name != 'None':
-        vpt_renderer.module().set_denoiser(denoiser_name)
 
     #mode = 'Delta Tracking'
     mode = 'Next Event Tracking'
     #mode = 'Isosurfaces'
+    if test_case == 'Wholebody':
+        vpt_renderer.module().load_transfer_function_file(
+            str(pathlib.Path.home()) + '/Programming/C++/CloudRendering/Data/TransferFunctions/TF_Wholebody3.xml')
+        vpt_renderer.module().load_transfer_function_file_gradient(
+            str(pathlib.Path.home()) + '/Programming/C++/CloudRendering/Data/TransferFunctions/TF_WholebodyGrad1.xml')
+    elif test_case == 'Angiography':
+        vpt_renderer.module().load_transfer_function_file(
+            str(pathlib.Path.home()) + '/Programming/C++/CloudRendering/Data/TransferFunctions/HeadAngioDens.xml')
+        vpt_renderer.module().load_transfer_function_file_gradient(
+            str(pathlib.Path.home()) + '/Programming/C++/CloudRendering/Data/TransferFunctions/HeadAngioGrad.xml')
+    elif test_case == 'HeadDVR':
+        vpt_renderer.module().load_transfer_function_file(
+            str(pathlib.Path.home()) + '/Programming/C++/CloudRendering/Data/TransferFunctions/HeadDVR.xml')
+        mode = 'Ray Marching (Emission/Absorption)'
+
+    denoiser_name = 'None'
+    if mode != 'Ray Marching (Emission/Absorption)':
+        denoiser_name = 'OptiX Denoiser'
+    if denoiser_name != 'None':
+        vpt_renderer.module().set_denoiser(denoiser_name)
+
     spp = 256
     if mode == 'Delta Tracking':
         spp = 16384
@@ -267,6 +291,8 @@ if __name__ == '__main__':
         spp = 256
     elif mode == 'Isosurfaces':
         spp = 256
+    elif mode == 'Ray Marching (Emission/Absorption)':
+        spp = 16
     vpt_renderer.set_num_frames(spp)
     #if denoiser_name == 'None':
     #    if mode == 'Delta Tracking':
@@ -279,15 +305,25 @@ if __name__ == '__main__':
     #    vpt_renderer.set_num_frames(2)
     #vpt_renderer.module().set_vpt_mode_from_name('Delta Tracking')
     vpt_renderer.module().set_vpt_mode_from_name(mode)
-    vpt_renderer.module().set_use_isosurfaces(True)
-    use_gradient_mode = False
-    if use_gradient_mode:
+
+    if test_case == 'Wholebody':
+        vpt_renderer.module().set_use_isosurfaces(True)
+        use_gradient_mode = False
+        if use_gradient_mode:
+            vpt_renderer.module().set_isosurface_type('Gradient')
+            iso_value = 0.002
+        else:
+            vpt_renderer.module().set_isosurface_type('Density')
+            iso_value = 0.3
+        vpt_renderer.module().set_iso_value(iso_value)
+    elif test_case == 'Angiography':
+        vpt_renderer.module().set_use_isosurfaces(True)
         vpt_renderer.module().set_isosurface_type('Gradient')
-        iso_value = 0.002
-    else:
-        vpt_renderer.module().set_isosurface_type('Density')
-        iso_value = 0.3
-    vpt_renderer.module().set_iso_value(iso_value)
+        vpt_renderer.module().set_iso_value(0.05)
+    elif test_case == 'HeadDVR':
+        vpt_renderer.module().set_use_isosurfaces(False)
+        vpt_renderer.module().set_extinction_scale(10000.0)
+
     vpt_renderer.module().set_iso_surface_color([0.4, 0.4, 0.4])
     vpt_renderer.module().set_surface_brdf('Lambertian')
     #vpt_renderer.module().set_surface_brdf('Blinn Phong')
@@ -303,11 +339,14 @@ if __name__ == '__main__':
     ry = 0.5 * (aabb[3] - aabb[2])
     rz = 0.5 * (aabb[5] - aabb[4])
     radii_sorted = sorted([rx, ry, rz])
-    is_spherical = radii_sorted[2] - radii_sorted[0] < 0.01
+    #is_spherical = radii_sorted[2] - radii_sorted[0] < 0.01
+    is_spherical = radii_sorted[2] / radii_sorted[0] < 1.5
 
     start = time.time()
 
-    use_visibility_aware_sampling = True
+    use_visibility_aware_sampling = False
+    if test_case != 'HeadDVR':
+        use_visibility_aware_sampling = True
     ds = 2
     if use_visibility_aware_sampling:
         vpt_renderer.module().set_secondary_volume_downscaling_factor(ds)
@@ -323,8 +362,7 @@ if __name__ == '__main__':
             dtype=torch.float32, device=cuda_device)
         gains = torch.zeros(num_sampled_test_views, device=cpu_device)
 
-    num_frames = 256
-    #num_frames = 1
+    num_frames = 128
     for i in range(num_frames):
         if use_visibility_aware_sampling:
             vpt_renderer.set_num_frames(1)
@@ -401,7 +439,8 @@ if __name__ == '__main__':
         #]
         camera_info['fovy'] = vpt_renderer.module().get_camera_fovy()
         camera_info['aabb'] = aabb
-        camera_info['iso'] = iso_value
+        if test_case != 'HeadDVR':
+            camera_info['iso'] = iso_value
         camera_infos.append(camera_info)
         print(f'{i}/{num_frames}')
 
