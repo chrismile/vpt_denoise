@@ -179,6 +179,11 @@ def sample_view_matrix_box(aabb):
             camera_position[hi] += h / 2
         else:
             camera_position[hi] -= h / 2
+
+    use_camera_jitter_closeup = True
+    if use_camera_jitter_closeup and r / r_base < 1.5:
+        camera_forward
+
     #camera_position[0] += aabb[0]
     #camera_position[1] += aabb[2]
     #camera_position[2] += aabb[4]
@@ -201,6 +206,21 @@ def sample_view_matrix_box(aabb):
 
 def iceil(a, b):
     return -(a // -b)
+
+
+def check_camera_is_valid(occupation_volume, aabb, inverse_view_matrix):
+    min_pos = np.array([aabb[0], aabb[2], aabb[4]])
+    max_pos = np.array([aabb[1], aabb[3], aabb[5]])
+    camera_position = inverse_view_matrix[0:3, 3]
+    camera_position = (camera_position - min_pos) / (max_pos - min_pos)
+    camera_position = camera_position * occupation_volume.shape
+    voxel_position = np.empty(3, dtype=np.int32)
+    for i in range(3):
+        voxel_position[i] = int(camera_position[i])
+        if voxel_position[i] < 0 or voxel_position[i] >= occupation_volume.shape[2 - i]:
+            return True
+    is_cam_valid = occupation_volume[voxel_position[2], voxel_position[1], voxel_position[0]] == 0
+    return is_cam_valid
 
 
 if __name__ == '__main__':
@@ -237,9 +257,9 @@ if __name__ == '__main__':
     #    f.write(f'{vpt_renderer.module().get_camera_fovy()}')
     camera_infos = []
 
-    #test_case = 'Wholebody'
+    test_case = 'Wholebody'
     #test_case = 'Angiography'
-    test_case = 'HeadDVR'
+    #test_case = 'HeadDVR'
 
     data_dir = '/mnt/data/Flow/Scalar/'
     if not os.path.isdir(data_dir):
@@ -350,10 +370,11 @@ if __name__ == '__main__':
     ds = 2
     if use_visibility_aware_sampling:
         vpt_renderer.module().set_secondary_volume_downscaling_factor(ds)
-    num_sampled_test_views = 32
+    num_sampled_test_views = 128
     volume_voxel_size = vpt_renderer.module().get_volume_voxel_size()
     vis_volume_voxel_size = [iceil(x, ds) for x in volume_voxel_size]
     vis = None
+    occupation_volume = None
     gains = None
     if use_visibility_aware_sampling:
         vpt_renderer.set_num_frames(1)
@@ -361,6 +382,15 @@ if __name__ == '__main__':
             size=(vis_volume_voxel_size[0], vis_volume_voxel_size[1], vis_volume_voxel_size[2]),
             dtype=torch.float32, device=cuda_device)
         gains = torch.zeros(num_sampled_test_views, device=cpu_device)
+        # We need to render one frame before being able to call 'compute_occupation_volume'
+        vpt_renderer.set_num_frames(1)
+        vpt_renderer.module().set_use_feature_maps(['Transmittance Volume'])
+        vpt_test_tensor_cuda = vpt_renderer(test_tensor_cuda)
+        vpt_test_tensor_cuda = None
+        occupation_volume = vpt_renderer.module().compute_occupation_volume(test_tensor_cuda, ds, 3)
+        occupation_volume = occupation_volume.cpu().numpy()
+        #occupation_volume_array = occupation_volume.cpu().numpy().astype(np.float32)
+        #save_nc('/home/christoph/datasets/Test/occupation.nc', occupation_volume_array)
 
     num_frames = 128
     for i in range(num_frames):
@@ -369,10 +399,13 @@ if __name__ == '__main__':
             vpt_renderer.module().set_use_feature_maps(['Transmittance Volume'])
             tested_matrices = []
             for view_idx in range(num_sampled_test_views):
-                if is_spherical:
-                    view_matrix_array, vm, ivm = sample_view_matrix_circle(aabb)
-                else:
-                    view_matrix_array, vm, ivm = sample_view_matrix_box(aabb)
+                is_valid = False
+                while not is_valid:
+                    if is_spherical:
+                        view_matrix_array, vm, ivm = sample_view_matrix_circle(aabb)
+                    else:
+                        view_matrix_array, vm, ivm = sample_view_matrix_box(aabb)
+                    is_valid = check_camera_is_valid(occupation_volume, aabb, ivm)
                 vpt_renderer.module().overwrite_camera_view_matrix(view_matrix_array)
                 vpt_test_tensor_cuda = vpt_renderer(test_tensor_cuda)
                 transmittance_volume_tensor = vpt_renderer.module().get_transmittance_volume(test_tensor_cuda)
