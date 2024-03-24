@@ -145,6 +145,9 @@ def sample_view_matrix_circle(aabb):
 def jitter_direction(camera_forward, jitter_rad):
     v1 = np.array([0.0, 0.0, 1.0])
     v2 = camera_forward
+    # For more details see:
+    # - https://stackoverflow.com/questions/1171849/finding-quaternion-representing-the-rotation-from-one-vector-to-another
+    # - https://math.stackexchange.com/questions/180418/calculate-rotation-matrix-to-align-vector-a-to-vector-b-in-3d
     q_xyz = np.cross(v1, v2)
     q_w = np.inner(v1, v1) * np.inner(v2, v2) + np.dot(v1, v2)
     transform = Rotation.from_quat(np.array([q_xyz[0], q_xyz[1], q_xyz[2], q_w]))
@@ -197,7 +200,7 @@ def sample_view_matrix_box(aabb):
     use_camera_jitter_closeup = True
     if use_camera_jitter_closeup and r / r_base < 1.5:
         jitter_rad = 30.0 / 180.0 * np.pi
-        jitter_direction(camera_forward, jitter_rad)
+        camera_forward = jitter_direction(camera_forward, jitter_rad)
 
     #camera_position[0] += aabb[0]
     #camera_position[1] += aabb[2]
