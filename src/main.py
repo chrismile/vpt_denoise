@@ -31,6 +31,7 @@ import json
 import pathlib
 import matplotlib.pyplot as plt
 import numpy as np
+from scipy.spatial.transform import Rotation as Rotation
 import torch
 #conda install -c conda-forge openexr-python
 import OpenEXR
@@ -141,6 +142,19 @@ def sample_view_matrix_circle(aabb):
     return view_matrix_array, view_matrix, inverse_view_matrix
 
 
+def jitter_direction(camera_forward, jitter_rad):
+    v1 = np.array([0.0, 0.0, 1.0])
+    v2 = camera_forward
+    q_xyz = np.cross(v1, v2)
+    q_w = np.inner(v1, v1) * np.inner(v2, v2) + np.dot(v1, v2)
+    transform = Rotation.from_quat(np.array([q_xyz[0], q_xyz[1], q_xyz[2], q_w]))
+    phi = np.random.uniform(0.0, 2.0 * np.pi)
+    theta = np.random.uniform(0, jitter_rad)
+    vec_spherical = np.array([np.sin(theta) * np.cos(phi), np.sin(theta) * np.sin(phi), np.cos(theta)])
+    vec_new = transform.apply(vec_spherical)
+    return vec_new
+
+
 def sample_view_matrix_box(aabb):
     global_up = np.array([0.0, 1.0, 0.0])
     rx = 0.5 * (aabb[1] - aabb[0])
@@ -182,7 +196,8 @@ def sample_view_matrix_box(aabb):
 
     use_camera_jitter_closeup = True
     if use_camera_jitter_closeup and r / r_base < 1.5:
-        camera_forward
+        jitter_rad = 30.0 / 180.0 * np.pi
+        jitter_direction(camera_forward, jitter_rad)
 
     #camera_position[0] += aabb[0]
     #camera_position[1] += aabb[2]
@@ -208,19 +223,127 @@ def iceil(a, b):
     return -(a // -b)
 
 
-def check_camera_is_valid(occupation_volume, aabb, inverse_view_matrix):
+def build_projection_matrix(fovy, aspect):
+    z_near = 0.01
+    z_far = 100.0
+    tan_half_fovy = np.tan(fovy / 2.0)
+    result = np.zeros((4, 4))
+    result[0, 0] = 1.0 / (aspect * tan_half_fovy)
+    result[1, 1] = 1.0 / tan_half_fovy
+    result[2, 2] = z_far / (z_near - z_far)
+    result[2, 3] = -1.0
+    result[3, 2] = -(z_far * z_near) / (z_far - z_near)
+    return result
+
+
+class Plane:
+    def __init__(self, a, b, c, d):
+        self.a = a
+        self.b = b
+        self.c = c
+        self.d = d
+
+    def get_normal(self):
+        return np.array([self.a, self.b, self.c])
+
+    def get_distance(self, pt):
+        return self.a * pt[0] + self.b * pt[1] + self.c * pt[2] + self.d
+
+    def is_outside(self, aabb):
+        aabb_center = 0.5 * np.array([aabb[1] + aabb[0], aabb[3] + aabb[2], aabb[5] + aabb[4]])
+        extent = 0.5 * np.array([aabb[1] - aabb[0], aabb[3] - aabb[2], aabb[5] - aabb[4]])
+        center_dist = self.get_distance(aabb_center)
+        max_abs_dist = abs(self.a * extent[0] + self.b * extent[1] + self.c * extent[2])
+        return -center_dist > max_abs_dist
+
+
+def check_aabb_visible_in_view_frustum(vp_matrix, aabb):
+    # The underlying idea of the following code comes from
+    # http:#www.lighthouse3d.com/tutorials/view-frustum-culling/clip-space-approach-implementation-details/
+    frustum_planes = []
+
+    # Near plane
+    frustum_planes.append(Plane(
+            vp_matrix[0, 3] + vp_matrix[0, 2],
+            vp_matrix[1, 3] + vp_matrix[1, 2],
+            vp_matrix[2, 3] + vp_matrix[2, 2],
+            vp_matrix[3, 3] + vp_matrix[3, 2]))
+
+    # Far plane
+    frustum_planes.append(Plane(
+            vp_matrix[0, 3] - vp_matrix[0, 2],
+            vp_matrix[1, 3] - vp_matrix[1, 2],
+            vp_matrix[2, 3] - vp_matrix[2, 2],
+            vp_matrix[3, 3] - vp_matrix[3, 2]))
+
+    # Left plane
+    frustum_planes.append(Plane(
+            vp_matrix[0, 3] + vp_matrix[0, 0],
+            vp_matrix[1, 3] + vp_matrix[1, 0],
+            vp_matrix[2, 3] + vp_matrix[2, 0],
+            vp_matrix[3, 3] + vp_matrix[3, 0]))
+
+    # Right plane
+    frustum_planes.append(Plane(
+            vp_matrix[0, 3] - vp_matrix[0, 0],
+            vp_matrix[1, 3] - vp_matrix[1, 0],
+            vp_matrix[2, 3] - vp_matrix[2, 0],
+            vp_matrix[3, 3] - vp_matrix[3, 0]))
+
+    # Bottom plane
+    frustum_planes.append(Plane(
+            vp_matrix[0, 3] + vp_matrix[0, 1],
+            vp_matrix[1, 3] + vp_matrix[1, 1],
+            vp_matrix[2, 3] + vp_matrix[2, 1],
+            vp_matrix[3, 3] + vp_matrix[3, 1]))
+
+    # Top plane
+    frustum_planes.append(Plane(
+            vp_matrix[0, 3] - vp_matrix[0, 1],
+            vp_matrix[1, 3] - vp_matrix[1, 1],
+            vp_matrix[2, 3] - vp_matrix[2, 1],
+            vp_matrix[3, 3] - vp_matrix[3, 1]))
+
+    # Normalize parameters
+    for i in range(6):
+        normal_length = np.linalg.norm(frustum_planes[i].get_normal())
+        frustum_planes[i].a /= normal_length
+        frustum_planes[i].b /= normal_length
+        frustum_planes[i].c /= normal_length
+        frustum_planes[i].d /= normal_length
+
+    # Not visible if all points on negative side of one plane
+    for i in range(6):
+        if frustum_planes[i].is_outside(aabb):
+            return False
+    return True
+
+
+def check_camera_is_valid(occupation_volume, aabb, view_matrix, inverse_view_matrix, fovy, aspect):
     min_pos = np.array([aabb[0], aabb[2], aabb[4]])
     max_pos = np.array([aabb[1], aabb[3], aabb[5]])
+
+    # Test if the camera does not lie in an occupied voxel.
     camera_position = inverse_view_matrix[0:3, 3]
     camera_position = (camera_position - min_pos) / (max_pos - min_pos)
     camera_position = camera_position * occupation_volume.shape
     voxel_position = np.empty(3, dtype=np.int32)
+    is_outside_volume = False
     for i in range(3):
         voxel_position[i] = int(camera_position[i])
         if voxel_position[i] < 0 or voxel_position[i] >= occupation_volume.shape[2 - i]:
-            return True
-    is_cam_valid = occupation_volume[voxel_position[2], voxel_position[1], voxel_position[0]] == 0
-    return is_cam_valid
+            is_outside_volume = True
+            break
+    if not is_outside_volume and occupation_volume[voxel_position[2], voxel_position[1], voxel_position[0]] != 0:
+        return False
+
+    # Test if the AABB is visible in the camera view frustum.
+    projection_matrix = build_projection_matrix(fovy, aspect)
+    vp_matrix = projection_matrix * view_matrix
+    if not check_aabb_visible_in_view_frustum(vp_matrix, aabb):
+        return False
+
+    return True
 
 
 if __name__ == '__main__':
@@ -240,6 +363,7 @@ if __name__ == '__main__':
     test_mode = False
     image_width = 1024
     image_height = 1024
+    aspect = image_width / image_height
 
     test_tensor_cpu = torch.ones((4, image_height, image_width), dtype=torch.float32, device=cpu_device)
     test_tensor_cuda = torch.ones((4, image_height, image_width), dtype=torch.float32, device=cuda_device)
@@ -391,6 +515,7 @@ if __name__ == '__main__':
         occupation_volume = occupation_volume.cpu().numpy()
         #occupation_volume_array = occupation_volume.cpu().numpy().astype(np.float32)
         #save_nc('/home/christoph/datasets/Test/occupation.nc', occupation_volume_array)
+    fovy = vpt_renderer.module().get_camera_fovy()
 
     num_frames = 128
     for i in range(num_frames):
@@ -405,7 +530,7 @@ if __name__ == '__main__':
                         view_matrix_array, vm, ivm = sample_view_matrix_circle(aabb)
                     else:
                         view_matrix_array, vm, ivm = sample_view_matrix_box(aabb)
-                    is_valid = check_camera_is_valid(occupation_volume, aabb, ivm)
+                    is_valid = check_camera_is_valid(occupation_volume, aabb, vm, ivm, fovy, aspect)
                 vpt_renderer.module().overwrite_camera_view_matrix(view_matrix_array)
                 vpt_test_tensor_cuda = vpt_renderer(test_tensor_cuda)
                 transmittance_volume_tensor = vpt_renderer.module().get_transmittance_volume(test_tensor_cuda)
