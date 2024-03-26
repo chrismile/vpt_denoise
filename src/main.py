@@ -41,6 +41,10 @@ from vpt import VolumetricPathTracingRenderer
 import time
 #from netCDF4 import Dataset
 
+# Bayesian optimization
+# conda install -c conda-forge bayesian-optimization
+from bayes_opt import BayesianOptimization, UtilityFunction
+
 
 #def save_nc(file_path, data):
 #    zs = data.shape[0]
@@ -222,6 +226,53 @@ def sample_view_matrix_box(aabb):
     return view_matrix_array, view_matrix, inverse_view_matrix
 
 
+def sample_random_view_parametrized(params):
+    u = params['u']
+    v = params['v']
+    w = params['w']
+    camera_position = np.array([params['cx'], params['cy'], params['cz']])
+    h = Rotation.from_quat(np.array([
+        np.sqrt(1-u) * np.sin(2*np.pi*v),
+        np.sqrt(1-u) * np.cos(2*np.pi*v),
+        np.sqrt(u) * np.sin(2*np.pi*w),
+        np.sqrt(u) * np.cos(2*np.pi*w)
+    ]))
+    rotation_matrix = np.zeros((4, 4))
+    rotation_matrix[:3, :3] = h.as_matrix()
+    rotation_matrix[3, 3] = 1
+    inverse_view_matrix = matrix_translation(camera_position).dot(rotation_matrix)
+    view_matrix = np.linalg.inv(inverse_view_matrix)
+    view_matrix_array = np.empty(16)
+    for i in range(4):
+        for j in range(4):
+            view_matrix_array[i * 4 + j] = view_matrix[j, i]
+    return view_matrix_array, view_matrix, inverse_view_matrix
+
+
+def get_position_random_range(aabb):
+    rx = 0.5 * (aabb[1] - aabb[0])
+    ry = 0.5 * (aabb[3] - aabb[2])
+    rz = 0.5 * (aabb[5] - aabb[4])
+    r_median = np.median([rx, ry, rz])
+    return [(aabb[i * 2] - 2.0 * r_median, aabb[i * 2 + 1] + 2.0 * r_median) for i in range(3)]
+
+
+def sample_random_view(aabb):
+    # https://stackoverflow.com/questions/31600717/how-to-generate-a-random-quaternion-quickly
+    rvec = np.random.uniform(0.0, 1.0, 3)
+    u = rvec[0]
+    v = rvec[1]
+    w = rvec[2]
+    cam_pos_range = get_position_random_range(aabb)
+    camera_position = np.array([np.random.uniform(cam_pos_range[i][0], cam_pos_range[i][1]) for i in range(3)])
+    params = {
+        'cx': camera_position[0], 'cy': camera_position[1], 'cz': camera_position[2],
+        'u': u, 'v': v, 'w': w
+    }
+    view_matrix_array, view_matrix, inverse_view_matrix = sample_random_view_parametrized(params)
+    return view_matrix_array, view_matrix, inverse_view_matrix, params
+
+
 def iceil(a, b):
     return -(a // -b)
 
@@ -234,8 +285,8 @@ def build_projection_matrix(fovy, aspect):
     result[0, 0] = 1.0 / (aspect * tan_half_fovy)
     result[1, 1] = 1.0 / tan_half_fovy
     result[2, 2] = z_far / (z_near - z_far)
-    result[2, 3] = -1.0
-    result[3, 2] = -(z_far * z_near) / (z_far - z_near)
+    result[3, 2] = -1.0
+    result[2, 3] = -(z_far * z_near) / (z_far - z_near)
     return result
 
 
@@ -267,45 +318,45 @@ def check_aabb_visible_in_view_frustum(vp_matrix, aabb):
 
     # Near plane
     frustum_planes.append(Plane(
-            vp_matrix[0, 3] + vp_matrix[0, 2],
-            vp_matrix[1, 3] + vp_matrix[1, 2],
-            vp_matrix[2, 3] + vp_matrix[2, 2],
-            vp_matrix[3, 3] + vp_matrix[3, 2]))
+            vp_matrix[3, 0] + vp_matrix[2, 0],
+            vp_matrix[3, 1] + vp_matrix[2, 1],
+            vp_matrix[3, 2] + vp_matrix[2, 2],
+            vp_matrix[3, 3] + vp_matrix[2, 3]))
 
     # Far plane
     frustum_planes.append(Plane(
-            vp_matrix[0, 3] - vp_matrix[0, 2],
-            vp_matrix[1, 3] - vp_matrix[1, 2],
-            vp_matrix[2, 3] - vp_matrix[2, 2],
-            vp_matrix[3, 3] - vp_matrix[3, 2]))
+            vp_matrix[3, 0] - vp_matrix[2, 0],
+            vp_matrix[3, 1] - vp_matrix[2, 1],
+            vp_matrix[3, 2] - vp_matrix[2, 2],
+            vp_matrix[3, 3] - vp_matrix[2, 3]))
 
     # Left plane
     frustum_planes.append(Plane(
-            vp_matrix[0, 3] + vp_matrix[0, 0],
-            vp_matrix[1, 3] + vp_matrix[1, 0],
-            vp_matrix[2, 3] + vp_matrix[2, 0],
-            vp_matrix[3, 3] + vp_matrix[3, 0]))
+            vp_matrix[3, 0] + vp_matrix[0, 0],
+            vp_matrix[3, 1] + vp_matrix[0, 1],
+            vp_matrix[3, 2] + vp_matrix[0, 2],
+            vp_matrix[3, 3] + vp_matrix[0, 3]))
 
     # Right plane
     frustum_planes.append(Plane(
-            vp_matrix[0, 3] - vp_matrix[0, 0],
-            vp_matrix[1, 3] - vp_matrix[1, 0],
-            vp_matrix[2, 3] - vp_matrix[2, 0],
-            vp_matrix[3, 3] - vp_matrix[3, 0]))
+            vp_matrix[3, 0] - vp_matrix[0, 0],
+            vp_matrix[3, 1] - vp_matrix[0, 1],
+            vp_matrix[3, 2] - vp_matrix[0, 2],
+            vp_matrix[3, 3] - vp_matrix[0, 3]))
 
     # Bottom plane
     frustum_planes.append(Plane(
-            vp_matrix[0, 3] + vp_matrix[0, 1],
-            vp_matrix[1, 3] + vp_matrix[1, 1],
-            vp_matrix[2, 3] + vp_matrix[2, 1],
-            vp_matrix[3, 3] + vp_matrix[3, 1]))
+            vp_matrix[3, 0] + vp_matrix[1, 0],
+            vp_matrix[3, 1] + vp_matrix[1, 1],
+            vp_matrix[3, 2] + vp_matrix[1, 2],
+            vp_matrix[3, 3] + vp_matrix[1, 3]))
 
     # Top plane
     frustum_planes.append(Plane(
-            vp_matrix[0, 3] - vp_matrix[0, 1],
-            vp_matrix[1, 3] - vp_matrix[1, 1],
-            vp_matrix[2, 3] - vp_matrix[2, 1],
-            vp_matrix[3, 3] - vp_matrix[3, 1]))
+            vp_matrix[3, 0] - vp_matrix[1, 0],
+            vp_matrix[3, 1] - vp_matrix[1, 1],
+            vp_matrix[3, 2] - vp_matrix[1, 2],
+            vp_matrix[3, 3] - vp_matrix[1, 3]))
 
     # Normalize parameters
     for i in range(6):
@@ -342,7 +393,7 @@ def check_camera_is_valid(occupation_volume, aabb, view_matrix, inverse_view_mat
 
     # Test if the AABB is visible in the camera view frustum.
     projection_matrix = build_projection_matrix(fovy, aspect)
-    vp_matrix = projection_matrix * view_matrix
+    vp_matrix = projection_matrix.dot(view_matrix)
     if not check_aabb_visible_in_view_frustum(vp_matrix, aabb):
         return False
 
@@ -387,6 +438,8 @@ if __name__ == '__main__':
     test_case = 'Wholebody'
     #test_case = 'Angiography'
     #test_case = 'HeadDVR'
+
+    shall_sample_completely_random_views = True
 
     data_dir = '/mnt/data/Flow/Scalar/'
     if not os.path.isdir(data_dir):
@@ -497,6 +550,8 @@ if __name__ == '__main__':
     ds = 2
     if use_visibility_aware_sampling:
         vpt_renderer.module().set_secondary_volume_downscaling_factor(ds)
+    # use_bos = False  # Bayesian optimal sampling
+    use_bos = use_visibility_aware_sampling  # Bayesian optimal sampling
     num_sampled_test_views = 128
     volume_voxel_size = vpt_renderer.module().get_volume_voxel_size()
     vis_volume_voxel_size = [iceil(x, ds) for x in volume_voxel_size]
@@ -525,25 +580,72 @@ if __name__ == '__main__':
         if use_visibility_aware_sampling:
             vpt_renderer.set_num_frames(1)
             vpt_renderer.module().set_use_feature_maps(['Transmittance Volume'])
-            tested_matrices = []
-            for view_idx in range(num_sampled_test_views):
-                is_valid = False
-                while not is_valid:
-                    if is_spherical:
-                        view_matrix_array, vm, ivm = sample_view_matrix_circle(aabb)
-                    else:
-                        view_matrix_array, vm, ivm = sample_view_matrix_box(aabb)
-                    is_valid = check_camera_is_valid(occupation_volume, aabb, vm, ivm, fovy, aspect)
-                vpt_renderer.module().overwrite_camera_view_matrix(view_matrix_array)
-                vpt_test_tensor_cuda = vpt_renderer(test_tensor_cuda)
-                transmittance_volume_tensor = vpt_renderer.module().get_transmittance_volume(test_tensor_cuda)
-                #transmittance_array = transmittance_volume_tensor.cpu().numpy()
-                #save_nc('/home/christoph/datasets/Test/vis.nc', transmittance_array)
-                gains[view_idx] = ((vis + transmittance_volume_tensor).clamp(0, 1) - vis).sum().cpu()
-                tested_matrices.append((view_matrix_array, vm, ivm))
-            # Get the best view
-            idx = gains.argmax().item()
-            view_matrix_array, vm, ivm = tested_matrices[idx]
+
+            if not use_bos:
+                tested_matrices = []
+                for view_idx in range(num_sampled_test_views):
+                    is_valid = False
+                    while not is_valid:
+                        if shall_sample_completely_random_views:
+                            view_matrix_array, vm, ivm, _ = sample_random_view(aabb)
+                        elif is_spherical:
+                            view_matrix_array, vm, ivm = sample_view_matrix_circle(aabb)
+                        else:
+                            view_matrix_array, vm, ivm = sample_view_matrix_box(aabb)
+                        is_valid = check_camera_is_valid(occupation_volume, aabb, vm, ivm, fovy, aspect)
+                    vpt_renderer.module().overwrite_camera_view_matrix(view_matrix_array)
+                    vpt_test_tensor_cuda = vpt_renderer(test_tensor_cuda)
+                    transmittance_volume_tensor = vpt_renderer.module().get_transmittance_volume(test_tensor_cuda)
+                    #transmittance_array = transmittance_volume_tensor.cpu().numpy()
+                    #save_nc('/home/christoph/datasets/Test/vis.nc', transmittance_array)
+                    gains[view_idx] = ((vis + transmittance_volume_tensor).clamp(0, 1) - vis).sum().cpu()
+                    tested_matrices.append((view_matrix_array, vm, ivm))
+                # Get the best view
+                idx = gains.argmax().item()
+                view_matrix_array, vm, ivm = tested_matrices[idx]
+            else:
+                def sample_camera_pose_gain_function(cx, cy, cz, u, v, w):
+                    #nonlocal vis
+                    params = {
+                        'cx': cx, 'cy': cy, 'cz': cz, 'u': u, 'v': v, 'w': w
+                    }
+                    view_matrix_array, vm, ivm = sample_random_view_parametrized(params)
+                    vpt_renderer.module().overwrite_camera_view_matrix(view_matrix_array)
+                    vpt_test_tensor_cuda = vpt_renderer(test_tensor_cuda)
+                    transmittance_volume_tensor = vpt_renderer.module().get_transmittance_volume(test_tensor_cuda)
+                    gain = ((vis + transmittance_volume_tensor).clamp(0, 1) - vis).sum().cpu()
+                    return gain
+                cam_bounds = get_position_random_range(aabb)
+                pbounds = {
+                    'cx': (cam_bounds[0][0], cam_bounds[0][1]),
+                    'cy': (cam_bounds[1][0], cam_bounds[1][1]),
+                    'cz': (cam_bounds[2][0], cam_bounds[2][1]),
+                    'u': (0.0, 1.0),
+                    'v': (0.0, 1.0),
+                    'w': (0.0, 1.0),
+                }
+                bayesian_optimizer = BayesianOptimization(
+                    f=sample_camera_pose_gain_function,
+                    pbounds=pbounds,
+                    # random_state=random_state,  # random_state = np.random.RandomState(17)
+                )
+                for view_idx in range(num_sampled_test_views):
+                    is_valid = False
+                    while not is_valid:
+                        view_matrix_array, vm, ivm, params = sample_random_view(aabb)
+                        is_valid = check_camera_is_valid(occupation_volume, aabb, vm, ivm, fovy, aspect)
+                    bayesian_optimizer.probe(
+                       params=params, lazy=True,
+                    )
+                acquisition_function = UtilityFunction(kind="ucb", kappa=10)
+                bayesian_optimizer.maximize(
+                    init_points=0, n_iter=30,
+                    acquisition_function=acquisition_function
+                )
+                optimal_gain = bayesian_optimizer.max['target']
+                best_cam_pose = bayesian_optimizer.max['params']
+                view_matrix_array, vm, ivm = sample_random_view_parametrized(best_cam_pose)
+
             vpt_renderer.module().overwrite_camera_view_matrix(view_matrix_array)
             vpt_test_tensor_cuda = vpt_renderer(test_tensor_cuda)
             transmittance_volume_tensor = vpt_renderer.module().get_transmittance_volume(test_tensor_cuda)
@@ -551,7 +653,9 @@ if __name__ == '__main__':
             vpt_renderer.set_num_frames(spp)
             vpt_renderer.module().set_use_feature_maps(used_feature_maps)
         else:
-            if is_spherical:
+            if shall_sample_completely_random_views:
+                view_matrix_array, vm, ivm, _ = sample_random_view(aabb)
+            elif is_spherical:
                 view_matrix_array, vm, ivm = sample_view_matrix_circle(aabb)
             else:
                 view_matrix_array, vm, ivm = sample_view_matrix_box(aabb)
