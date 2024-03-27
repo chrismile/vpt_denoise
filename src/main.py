@@ -569,8 +569,9 @@ if __name__ == '__main__':
         vpt_renderer.module().set_use_feature_maps(['Transmittance Volume'])
         vpt_test_tensor_cuda = vpt_renderer(test_tensor_cuda)
         vpt_test_tensor_cuda = None
-        occupation_volume = vpt_renderer.module().compute_occupation_volume(test_tensor_cuda, ds, 3)
-        occupation_volume = occupation_volume.cpu().numpy()
+        occupation_volume = vpt_renderer.module().compute_occupation_volume(test_tensor_cuda, ds, 3).cpu().numpy()
+        occupation_volume_narrow = vpt_renderer.module().compute_occupation_volume(test_tensor_cuda, ds, 0)
+        #vis = (1.0 - occupation_volume_narrow).to(device=cuda_device, dtype=torch.float32)
         #occupation_volume_array = occupation_volume.cpu().numpy().astype(np.float32)
         #save_nc('/home/christoph/datasets/Test/occupation.nc', occupation_volume_array)
     fovy = vpt_renderer.module().get_camera_fovy()
@@ -598,7 +599,7 @@ if __name__ == '__main__':
                     transmittance_volume_tensor = vpt_renderer.module().get_transmittance_volume(test_tensor_cuda)
                     #transmittance_array = transmittance_volume_tensor.cpu().numpy()
                     #save_nc('/home/christoph/datasets/Test/vis.nc', transmittance_array)
-                    gains[view_idx] = ((vis + transmittance_volume_tensor).clamp(0, 1) - vis).sum().cpu()
+                    gains[view_idx] = (((vis + transmittance_volume_tensor).clamp(0, 1) - vis) * occupation_volume_narrow).sum().cpu()
                     tested_matrices.append((view_matrix_array, vm, ivm))
                 # Get the best view
                 idx = gains.argmax().item()
@@ -613,7 +614,7 @@ if __name__ == '__main__':
                     vpt_renderer.module().overwrite_camera_view_matrix(view_matrix_array)
                     vpt_test_tensor_cuda = vpt_renderer(test_tensor_cuda)
                     transmittance_volume_tensor = vpt_renderer.module().get_transmittance_volume(test_tensor_cuda)
-                    gain = ((vis + transmittance_volume_tensor).clamp(0, 1) - vis).sum().cpu()
+                    gain = (((vis + transmittance_volume_tensor).clamp(0, 1) - vis) * occupation_volume_narrow).sum().cpu()
                     return gain
                 cam_bounds = get_position_random_range(aabb)
                 pbounds = {
@@ -639,7 +640,7 @@ if __name__ == '__main__':
                     )
                 acquisition_function = UtilityFunction(kind="ucb", kappa=10)
                 bayesian_optimizer.maximize(
-                    init_points=0, n_iter=30,
+                    init_points=0, n_iter=num_sampled_test_views,
                     acquisition_function=acquisition_function
                 )
                 optimal_gain = bayesian_optimizer.max['target']
