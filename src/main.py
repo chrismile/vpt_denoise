@@ -552,8 +552,8 @@ if __name__ == '__main__':
     ds = 2
     if use_visibility_aware_sampling:
         vpt_renderer.module().set_secondary_volume_downscaling_factor(ds)
-    use_bos = False  # Bayesian optimal sampling
-    # use_bos = use_visibility_aware_sampling  # Bayesian optimal sampling
+    # use_bos = False  # Bayesian optimal sampling
+    use_bos = use_visibility_aware_sampling  # Bayesian optimal sampling
     num_sampled_test_views = 128
     volume_voxel_size = vpt_renderer.module().get_volume_voxel_size()
     vis_volume_voxel_size = [iceil(x, ds) for x in volume_voxel_size]
@@ -582,6 +582,7 @@ if __name__ == '__main__':
     for i in range(num_frames):
         if use_mixed_mode:
             use_visibility_aware_sampling = i >= num_frames // 2
+            shall_sample_completely_random_views = use_visibility_aware_sampling
 
         if use_visibility_aware_sampling:
             vpt_renderer.set_num_frames(1)
