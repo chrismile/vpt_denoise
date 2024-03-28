@@ -169,10 +169,11 @@ def sample_view_matrix_box(aabb):
     rz = 0.5 * (aabb[5] - aabb[4])
     radii_sorted = sorted([rx, ry, rz])
     r_base = np.sqrt(radii_sorted[0] ** 2 + radii_sorted[1] ** 2)
-    if random.randint(0, 1) == 0:
-        r = random.uniform(1.5 * r_base, r_base * 3.0)
-    else:
-        r = random.uniform(0.5 * r_base, r_base * 1.5)  # TODO
+    #if random.randint(0, 1) == 0:
+    #    r = random.uniform(1.5 * r_base, r_base * 3.0)
+    #else:
+    #    r = random.uniform(0.5 * r_base, r_base * 1.5)  # TODO
+    r = random.uniform(1.5 * r_base, r_base * 3.0)
     h = 2 * radii_sorted[2]
     hi = 0 if rx >= ry and rx >= rz else (1 if ry >= rz else 2)
     r0i = 0 if hi != 0 else 1
@@ -544,14 +545,15 @@ if __name__ == '__main__':
 
     start = time.time()
 
-    use_visibility_aware_sampling = False
+    use_mixed_mode = True
+    use_visibility_aware_sampling = True
     if test_case != 'HeadDVR':
         use_visibility_aware_sampling = True
     ds = 2
     if use_visibility_aware_sampling:
         vpt_renderer.module().set_secondary_volume_downscaling_factor(ds)
-    # use_bos = False  # Bayesian optimal sampling
-    use_bos = use_visibility_aware_sampling  # Bayesian optimal sampling
+    use_bos = False  # Bayesian optimal sampling
+    # use_bos = use_visibility_aware_sampling  # Bayesian optimal sampling
     num_sampled_test_views = 128
     volume_voxel_size = vpt_renderer.module().get_volume_voxel_size()
     vis_volume_voxel_size = [iceil(x, ds) for x in volume_voxel_size]
@@ -576,8 +578,11 @@ if __name__ == '__main__':
         #save_nc('/home/christoph/datasets/Test/occupation.nc', occupation_volume_array)
     fovy = vpt_renderer.module().get_camera_fovy()
 
-    num_frames = 128
+    num_frames = 256
     for i in range(num_frames):
+        if use_mixed_mode:
+            use_visibility_aware_sampling = i >= num_frames // 2
+
         if use_visibility_aware_sampling:
             vpt_renderer.set_num_frames(1)
             vpt_renderer.module().set_use_feature_maps(['Transmittance Volume'])
@@ -661,6 +666,14 @@ if __name__ == '__main__':
             else:
                 view_matrix_array, vm, ivm = sample_view_matrix_box(aabb)
             vpt_renderer.module().overwrite_camera_view_matrix(view_matrix_array)
+            if use_mixed_mode:
+                vpt_renderer.set_num_frames(1)
+                vpt_renderer.module().set_use_feature_maps(['Transmittance Volume'])
+                vpt_test_tensor_cuda = vpt_renderer(test_tensor_cuda)
+                transmittance_volume_tensor = vpt_renderer.module().get_transmittance_volume(test_tensor_cuda)
+                vis = (vis + transmittance_volume_tensor).clamp(0, 1)
+                vpt_renderer.set_num_frames(spp)
+                vpt_renderer.module().set_use_feature_maps(used_feature_maps)
 
         #torch.cuda.synchronize()
 
