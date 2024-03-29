@@ -618,6 +618,9 @@ if __name__ == '__main__':
                     }
                     view_matrix_array, vm, ivm = sample_random_view_parametrized(params)
                     vpt_renderer.module().overwrite_camera_view_matrix(view_matrix_array)
+                    is_valid = check_camera_is_valid(occupation_volume, aabb, vm, ivm, fovy, aspect)
+                    if not is_valid:
+                        return 0.0
                     vpt_test_tensor_cuda = vpt_renderer(test_tensor_cuda)
                     transmittance_volume_tensor = vpt_renderer.module().get_transmittance_volume(test_tensor_cuda)
                     gain = (((vis + transmittance_volume_tensor).clamp(0, 1) - vis) * occupation_volume_narrow).sum().cpu()
