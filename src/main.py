@@ -573,7 +573,7 @@ if __name__ == '__main__':
         vpt_renderer.module().set_use_feature_maps(['Transmittance Volume'])
         vpt_test_tensor_cuda = vpt_renderer(test_tensor_cuda)
         vpt_test_tensor_cuda = None
-        occupation_volume = vpt_renderer.module().compute_occupation_volume(test_tensor_cuda, ds, 3).cpu().numpy()
+        occupation_volume = vpt_renderer.module().compute_occupation_volume(test_tensor_cuda, ds, 10).cpu().numpy()
         occupation_volume_narrow = vpt_renderer.module().compute_occupation_volume(test_tensor_cuda, ds, 0)
         #vis = (1.0 - occupation_volume_narrow).to(device=cuda_device, dtype=torch.float32)
         #occupation_volume_array = occupation_volume.cpu().numpy().astype(np.float32)
@@ -671,6 +671,7 @@ if __name__ == '__main__':
                 view_matrix_array, vm, ivm = sample_view_matrix_circle(aabb)
             else:
                 view_matrix_array, vm, ivm = sample_view_matrix_box(aabb)
+
             vpt_renderer.module().overwrite_camera_view_matrix(view_matrix_array)
             if use_mixed_mode:
                 vpt_renderer.set_num_frames(1)
