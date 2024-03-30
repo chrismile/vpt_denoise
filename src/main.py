@@ -379,14 +379,16 @@ def check_camera_is_valid(occupation_volume, aabb, view_matrix, inverse_view_mat
     max_pos = np.array([aabb[1], aabb[3], aabb[5]])
 
     # Test if the camera does not lie in an occupied voxel.
+    occupation_volume_shape = np.array(
+        [occupation_volume.shape[2], occupation_volume.shape[1], occupation_volume.shape[0]], dtype=np.int32)
     camera_position = inverse_view_matrix[0:3, 3]
     camera_position = (camera_position - min_pos) / (max_pos - min_pos)
-    camera_position = camera_position * occupation_volume.shape
+    camera_position = camera_position * occupation_volume_shape
     voxel_position = np.empty(3, dtype=np.int32)
     is_outside_volume = False
     for i in range(3):
         voxel_position[i] = int(camera_position[i])
-        if voxel_position[i] < 0 or voxel_position[i] >= occupation_volume.shape[2 - i]:
+        if voxel_position[i] < 0 or voxel_position[i] >= occupation_volume_shape[i]:
             is_outside_volume = True
             break
     if not is_outside_volume and occupation_volume[voxel_position[2], voxel_position[1], voxel_position[0]] != 0:
