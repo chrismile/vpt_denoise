@@ -27,6 +27,7 @@
 import os
 import random
 import datetime
+import queue
 import json
 import pathlib
 import matplotlib.pyplot as plt
@@ -279,8 +280,8 @@ def iceil(a, b):
 
 
 def build_projection_matrix(fovy, aspect):
-    z_near = 0.01
-    z_far = 100.0
+    z_near = 0.001953125
+    z_far = 80.0
     tan_half_fovy = np.tan(fovy / 2.0)
     result = np.zeros((4, 4))
     result[0, 0] = 1.0 / (aspect * tan_half_fovy)
@@ -386,13 +387,48 @@ def check_camera_is_valid(occupation_volume, aabb, view_matrix, inverse_view_mat
     camera_position = camera_position * occupation_volume_shape
     voxel_position = np.empty(3, dtype=np.int32)
     is_outside_volume = False
+    outside_dist = 100000
     for i in range(3):
         voxel_position[i] = int(camera_position[i])
         if voxel_position[i] < 0 or voxel_position[i] >= occupation_volume_shape[i]:
             is_outside_volume = True
-            break
+            if voxel_position[i] < 0:
+                outside_dist = min(-voxel_position[i], outside_dist)
+            elif voxel_position[i] >= occupation_volume_shape[i]:
+                outside_dist = min(voxel_position[i] - occupation_volume_shape[i], outside_dist)
     if not is_outside_volume and occupation_volume[voxel_position[2], voxel_position[1], voxel_position[0]] != 0:
         return False
+
+    max_outside_dist = 16
+    if is_outside_volume and outside_dist < max_outside_dist:
+        max_dist = outside_dist + 2
+        visited_points = set()
+        voxel_queue = queue.Queue()
+        voxel_queue.put((0, (voxel_position[0], voxel_position[1], voxel_position[2])))
+        found_neigh = False
+        best_neigh_depth = 10000
+        # Dist to occupied voxel.
+        while not voxel_queue.empty():
+            depth, curr_pos = voxel_queue.get()
+            for oz in range(-1, 2):
+                for oy in range(-1, 2):
+                    for ox in range(-1, 2):
+                        neigh_pos = (curr_pos[0] + ox, curr_pos[1] + oy, curr_pos[2] + oz)
+                        is_neighbor_outside_volume = False
+                        for i in range(3):
+                            if neigh_pos[i] < 0 or neigh_pos[i] >= occupation_volume_shape[i]:
+                                is_neighbor_outside_volume = True
+                        if neigh_pos in visited_points:
+                            continue
+                        if not is_neighbor_outside_volume:
+                            if occupation_volume[neigh_pos[2], neigh_pos[1], neigh_pos[0]] != 0:
+                                found_neigh = True
+                                best_neigh_depth = min(best_neigh_depth, depth + 1)
+                        if depth < max_dist:
+                            voxel_queue.put((depth + 1, neigh_pos))
+                        visited_points.add(neigh_pos)
+        if found_neigh and best_neigh_depth <= max_dist:
+            return False
 
     # Test if the AABB is visible in the camera view frustum.
     projection_matrix = build_projection_matrix(fovy, aspect)
@@ -573,7 +609,7 @@ if __name__ == '__main__':
         vpt_renderer.module().set_use_feature_maps(['Transmittance Volume'])
         vpt_test_tensor_cuda = vpt_renderer(test_tensor_cuda)
         vpt_test_tensor_cuda = None
-        occupation_volume = vpt_renderer.module().compute_occupation_volume(test_tensor_cuda, ds, 10).cpu().numpy()
+        occupation_volume = vpt_renderer.module().compute_occupation_volume(test_tensor_cuda, ds, 16).cpu().numpy()
         occupation_volume_narrow = vpt_renderer.module().compute_occupation_volume(test_tensor_cuda, ds, 0)
         #vis = (1.0 - occupation_volume_narrow).to(device=cuda_device, dtype=torch.float32)
         #occupation_volume_array = occupation_volume.cpu().numpy().astype(np.float32)
