@@ -478,8 +478,6 @@ if __name__ == '__main__':
     #test_case = 'Angiography'
     #test_case = 'HeadDVR'
 
-    shall_sample_completely_random_views = True
-
     data_dir = '/mnt/data/Flow/Scalar/'
     if not os.path.isdir(data_dir):
         data_dir = '/media/christoph/Elements/Datasets/Scalar/'
@@ -583,13 +581,13 @@ if __name__ == '__main__':
 
     start = time.time()
 
+    shall_sample_completely_random_views = True
     use_mixed_mode = True
     use_visibility_aware_sampling = True
-    if test_case != 'HeadDVR':
-        use_visibility_aware_sampling = True
+    if test_case == 'HeadDVR':
+        use_visibility_aware_sampling = False
     ds = 2
-    if use_visibility_aware_sampling:
-        vpt_renderer.module().set_secondary_volume_downscaling_factor(ds)
+    vpt_renderer.module().set_secondary_volume_downscaling_factor(ds)
     # use_bos = False  # Bayesian optimal sampling
     use_bos = use_visibility_aware_sampling  # Bayesian optimal sampling
     num_sampled_test_views = 128
@@ -599,21 +597,20 @@ if __name__ == '__main__':
     occupation_volume = None
     gains = None
     if use_visibility_aware_sampling:
-        vpt_renderer.set_num_frames(1)
         vis = torch.zeros(
             size=(vis_volume_voxel_size[0], vis_volume_voxel_size[1], vis_volume_voxel_size[2]),
             dtype=torch.float32, device=cuda_device)
         gains = torch.zeros(num_sampled_test_views, device=cpu_device)
-        # We need to render one frame before being able to call 'compute_occupation_volume'
-        vpt_renderer.set_num_frames(1)
-        vpt_renderer.module().set_use_feature_maps(['Transmittance Volume'])
-        vpt_test_tensor_cuda = vpt_renderer(test_tensor_cuda)
-        vpt_test_tensor_cuda = None
-        occupation_volume = vpt_renderer.module().compute_occupation_volume(test_tensor_cuda, ds, 3).cpu().numpy()
-        occupation_volume_narrow = vpt_renderer.module().compute_occupation_volume(test_tensor_cuda, ds, 0)
-        #vis = (1.0 - occupation_volume_narrow).to(device=cuda_device, dtype=torch.float32)
-        #occupation_volume_array = occupation_volume.cpu().numpy().astype(np.float32)
-        #save_nc('/home/christoph/datasets/Test/occupation.nc', occupation_volume_array)
+    # We need to render one frame before being able to call 'compute_occupation_volume'
+    vpt_renderer.set_num_frames(1)
+    vpt_renderer.module().set_use_feature_maps(['Transmittance Volume'])
+    vpt_test_tensor_cuda = vpt_renderer(test_tensor_cuda)
+    vpt_test_tensor_cuda = None
+    occupation_volume = vpt_renderer.module().compute_occupation_volume(test_tensor_cuda, ds, 3).cpu().numpy()
+    occupation_volume_narrow = vpt_renderer.module().compute_occupation_volume(test_tensor_cuda, ds, 0)
+    vpt_renderer.module().set_use_feature_maps(used_feature_maps)
+    #occupation_volume_array = occupation_volume.cpu().numpy().astype(np.float32)
+    #save_nc('/home/christoph/datasets/Test/occupation.nc', occupation_volume_array)
     fovy = vpt_renderer.module().get_camera_fovy()
 
     num_frames = 256
