@@ -399,7 +399,7 @@ def check_camera_is_valid(occupation_volume, aabb, view_matrix, inverse_view_mat
     if not is_outside_volume and occupation_volume[voxel_position[2], voxel_position[1], voxel_position[0]] != 0:
         return False
 
-    max_outside_dist = 14
+    max_outside_dist = 3
     if is_outside_volume and outside_dist < max_outside_dist:
         max_dist = outside_dist + 2
         visited_points = set()
@@ -609,7 +609,7 @@ if __name__ == '__main__':
         vpt_renderer.module().set_use_feature_maps(['Transmittance Volume'])
         vpt_test_tensor_cuda = vpt_renderer(test_tensor_cuda)
         vpt_test_tensor_cuda = None
-        occupation_volume = vpt_renderer.module().compute_occupation_volume(test_tensor_cuda, ds, 14).cpu().numpy()
+        occupation_volume = vpt_renderer.module().compute_occupation_volume(test_tensor_cuda, ds, 3).cpu().numpy()
         occupation_volume_narrow = vpt_renderer.module().compute_occupation_volume(test_tensor_cuda, ds, 0)
         #vis = (1.0 - occupation_volume_narrow).to(device=cuda_device, dtype=torch.float32)
         #occupation_volume_array = occupation_volume.cpu().numpy().astype(np.float32)
