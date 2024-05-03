@@ -474,9 +474,10 @@ if __name__ == '__main__':
     #    f.write(f'{vpt_renderer.module().get_camera_fovy()}')
     camera_infos = []
 
-    test_case = 'Wholebody'
+    #test_case = 'Wholebody'
     #test_case = 'Angiography'
     #test_case = 'HeadDVR'
+    test_case = 'HollowSphere'
 
     data_dir = '/mnt/data/Flow/Scalar/'
     if not os.path.isdir(data_dir):
@@ -492,6 +493,9 @@ if __name__ == '__main__':
     elif test_case == 'HeadDVR':
         vpt_renderer.module().load_volume_file(
             data_dir + 'Head [256 256 256] (MR)/Head_256x256x256.dat')
+    elif test_case == 'HollowSphere':
+        vpt_renderer.module().load_volume_file(
+            str(pathlib.Path.home()) + '/datasets/Toy/vpt/hollowsphere.dat')
     vpt_renderer.module().load_environment_map(
         str(pathlib.Path.home())
         + '/Programming/C++/CloudRendering/Data/CloudDataSets/env_maps/small_empty_room_1_4k_blurred.exr')
@@ -514,6 +518,9 @@ if __name__ == '__main__':
         vpt_renderer.module().load_transfer_function_file(
             str(pathlib.Path.home()) + '/Programming/C++/CloudRendering/Data/TransferFunctions/HeadDVR.xml')
         mode = 'Ray Marching (Emission/Absorption)'
+    elif test_case == 'HollowSphere':
+        vpt_renderer.module().load_transfer_function_file(
+            str(pathlib.Path.home()) + '/Programming/C++/CloudRendering/Data/TransferFunctions/HollowSphere.xml')
 
     denoiser_name = 'None'
     if mode != 'Ray Marching (Emission/Absorption)':
@@ -543,6 +550,7 @@ if __name__ == '__main__':
     #vpt_renderer.module().set_vpt_mode_from_name('Delta Tracking')
     vpt_renderer.module().set_vpt_mode_from_name(mode)
 
+    iso_value = 0.0
     if test_case == 'Wholebody':
         vpt_renderer.module().set_use_isosurfaces(True)
         use_gradient_mode = False
@@ -556,10 +564,13 @@ if __name__ == '__main__':
     elif test_case == 'Angiography':
         vpt_renderer.module().set_use_isosurfaces(True)
         vpt_renderer.module().set_isosurface_type('Gradient')
-        vpt_renderer.module().set_iso_value(0.05)
+        iso_value = 0.05
+        vpt_renderer.module().set_iso_value(iso_value)
     elif test_case == 'HeadDVR':
         vpt_renderer.module().set_use_isosurfaces(False)
         vpt_renderer.module().set_extinction_scale(10000.0)
+    elif test_case == 'HollowSphere':
+        vpt_renderer.module().set_use_isosurfaces(False)
 
     vpt_renderer.module().set_iso_surface_color([0.4, 0.4, 0.4])
     vpt_renderer.module().set_surface_brdf('Lambertian')
@@ -613,7 +624,7 @@ if __name__ == '__main__':
     #save_nc('/home/christoph/datasets/Test/occupation.nc', occupation_volume_array)
     fovy = vpt_renderer.module().get_camera_fovy()
 
-    num_frames = 256
+    num_frames = 32
     for i in range(num_frames):
         if use_mixed_mode:
             use_visibility_aware_sampling = i >= num_frames // 2
