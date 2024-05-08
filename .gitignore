@@ -9,6 +9,7 @@ modules/*
 
 # CLion
 .idea/*
+*/.idea/*
 cmake-build-*/
 
 
@@ -155,6 +156,7 @@ cython_debug/
 
 # Test images
 *.png
-.jpg
+*.pdf
+*.jpg
 out/*
 out*

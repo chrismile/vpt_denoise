@@ -45,6 +45,7 @@ import time
 # Bayesian optimization
 # conda install -c conda-forge bayesian-optimization
 from bayes_opt import BayesianOptimization, UtilityFunction
+import pylimbo
 
 
 #def save_nc(file_path, data):
@@ -315,7 +316,7 @@ class Plane:
 
 def check_aabb_visible_in_view_frustum(vp_matrix, aabb):
     # The underlying idea of the following code comes from
-    # http:#www.lighthouse3d.com/tutorials/view-frustum-culling/clip-space-approach-implementation-details/
+    # http://www.lighthouse3d.com/tutorials/view-frustum-culling/clip-space-approach-implementation-details/
     frustum_planes = []
 
     # Near plane
@@ -478,6 +479,8 @@ if __name__ == '__main__':
     #test_case = 'Angiography'
     #test_case = 'HeadDVR'
     test_case = 'HollowSphere'
+
+    use_python_bos_optimizer = False
 
     data_dir = '/mnt/data/Flow/Scalar/'
     if not os.path.isdir(data_dir):
@@ -657,11 +660,7 @@ if __name__ == '__main__':
                 idx = gains.argmax().item()
                 view_matrix_array, vm, ivm = tested_matrices[idx]
             else:
-                def sample_camera_pose_gain_function(cx, cy, cz, u, v, w):
-                    #nonlocal vis
-                    params = {
-                        'cx': cx, 'cy': cy, 'cz': cz, 'u': u, 'v': v, 'w': w
-                    }
+                def sample_camera_pose_gain_function_params(params):
                     view_matrix_array, vm, ivm = sample_random_view_parametrized(params)
                     vpt_renderer.module().overwrite_camera_view_matrix(view_matrix_array)
                     is_valid = check_camera_is_valid(occupation_volume, aabb, vm, ivm, fovy, aspect)
@@ -671,6 +670,11 @@ if __name__ == '__main__':
                     transmittance_volume_tensor = vpt_renderer.module().get_transmittance_volume(test_tensor_cuda)
                     gain = (((vis + transmittance_volume_tensor).clamp(0, 1) - vis) * occupation_volume_narrow).sum().cpu()
                     return gain
+                def sample_camera_pose_gain_function(cx, cy, cz, u, v, w):
+                    params = {
+                        'cx': cx, 'cy': cy, 'cz': cz, 'u': u, 'v': v, 'w': w
+                    }
+                    return sample_camera_pose_gain_function_params(params)
                 cam_bounds = get_position_random_range(aabb)
                 pbounds = {
                     'cx': (cam_bounds[0][0], cam_bounds[0][1]),
@@ -680,26 +684,43 @@ if __name__ == '__main__':
                     'v': (0.0, 1.0),
                     'w': (0.0, 1.0),
                 }
-                bayesian_optimizer = BayesianOptimization(
-                    f=sample_camera_pose_gain_function,
-                    pbounds=pbounds,
-                    # random_state=random_state,  # random_state = np.random.RandomState(17)
-                )
-                for view_idx in range(num_sampled_test_views):
-                    is_valid = False
-                    while not is_valid:
-                        view_matrix_array, vm, ivm, params = sample_random_view(aabb)
-                        is_valid = check_camera_is_valid(occupation_volume, aabb, vm, ivm, fovy, aspect)
-                    bayesian_optimizer.probe(
-                       params=params, lazy=True,
+
+                if use_python_bos_optimizer:
+                    bayesian_optimizer = BayesianOptimization(
+                        f=sample_camera_pose_gain_function,
+                        pbounds=pbounds,
+                        # random_state=random_state,  # random_state = np.random.RandomState(17)
                     )
-                acquisition_function = UtilityFunction(kind="ucb", kappa=10)
-                bayesian_optimizer.maximize(
-                    init_points=0, n_iter=num_sampled_test_views,
-                    acquisition_function=acquisition_function
-                )
-                optimal_gain = bayesian_optimizer.max['target']
-                best_cam_pose = bayesian_optimizer.max['params']
+                    for view_idx in range(num_sampled_test_views):
+                        is_valid = False
+                        while not is_valid:
+                            view_matrix_array, vm, ivm, params = sample_random_view(aabb)
+                            is_valid = check_camera_is_valid(occupation_volume, aabb, vm, ivm, fovy, aspect)
+                        bayesian_optimizer.probe(
+                           params=params, lazy=True,
+                        )
+                    acquisition_function = UtilityFunction(kind="ucb", kappa=10)
+                    bayesian_optimizer.maximize(
+                        init_points=0, n_iter=num_sampled_test_views,
+                        acquisition_function=acquisition_function
+                    )
+                    optimal_gain = bayesian_optimizer.max['target']
+                    best_cam_pose = bayesian_optimizer.max['params']
+                else:
+                    init_points = []
+                    for view_idx in range(num_sampled_test_views):
+                        is_valid = False
+                        while not is_valid:
+                            view_matrix_array, vm, ivm, params = sample_random_view(aabb)
+                            is_valid = check_camera_is_valid(occupation_volume, aabb, vm, ivm, fovy, aspect)
+                        init_points.append(params)
+                    settings = pylimbo.BayOptSettings()
+                    settings.pbounds = pbounds
+                    settings.num_iterations = num_sampled_test_views
+                    settings.ucb_kappa = 10
+                    optimal_gain, best_cam_pose = pylimbo.maximize(
+                        settings, init_points, sample_camera_pose_gain_function_params)
+
                 view_matrix_array, vm, ivm = sample_random_view_parametrized(best_cam_pose)
 
             vpt_renderer.module().overwrite_camera_view_matrix(view_matrix_array)

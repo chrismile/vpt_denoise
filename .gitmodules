@@ -1,0 +1,9 @@
+[submodule "pylimbo/third_party/limbo"]
+	path = pylimbo/third_party/limbo
+	url = https://github.com/chrismile/limbo.git
+[submodule "pylimbo/third_party/eigen"]
+	path = pylimbo/third_party/eigen
+	url = https://gitlab.com/libeigen/eigen.git
+[submodule "pydens2d/third_party/eigen"]
+	path = pydens2d/third_party/eigen
+	url = https://gitlab.com/libeigen/eigen.git
