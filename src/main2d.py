@@ -31,6 +31,8 @@ import datetime
 import queue
 import json
 import pathlib
+import sys
+
 import matplotlib.pyplot as plt
 import numpy as np
 from numba import njit
@@ -77,6 +79,33 @@ def sample_view_matrix_circle(aabb):
     return {'cx': camera_position[0], 'cy': camera_position[1], 'theta': theta}
 
 
+def generate_sample_quasirandom_plastic(sample_idx, seed=0.5):
+    # Compute phi(d).
+    d = 2
+    g = 2.0
+    for i in range(10):
+        g = np.power(1.0 + g, 1.0 / (d + 1.0))
+
+    alpha = np.empty(6)
+    for j in range(d):
+        alpha[j] = np.fmod(np.power(1.0 / g, float(j + 1)), 1.0)
+
+    x0 = np.fmod(seed + alpha[0] * float(sample_idx + 1), 1.0)
+    x1 = np.fmod(seed + alpha[1] * float(sample_idx + 1), 1.0)
+    return x0, x1
+
+
+def sample_view_matrix_circle_regular(aabb, sample_idx):
+    x0, x1 = generate_sample_quasirandom_plastic(sample_idx)
+    theta = 2.0 * np.pi * x1
+    r_total = 0.5 * vec_length(np.array([aabb[1] - aabb[0], aabb[3] - aabb[2]]))
+    r = r_total * (1.25 + 0.5 * x0)
+    cos_theta = np.cos(theta)
+    sin_theta = np.sin(theta)
+    camera_position = np.array([r * -cos_theta, r * -sin_theta])
+    return {'cx': camera_position[0], 'cy': camera_position[1], 'theta': theta}
+
+
 def get_position_random_range(aabb):
     rx = 0.5 * (aabb[1] - aabb[0])
     ry = 0.5 * (aabb[3] - aabb[2])
@@ -88,7 +117,7 @@ def get_position_random_range(aabb):
 def sample_random_view(aabb):
     theta = random.uniform(0.0, 2.0 * np.pi)
     cam_pos_range = get_position_random_range(aabb)
-    camera_position = np.array([np.random.uniform(cam_pos_range[i][0], cam_pos_range[i][1]) for i in range(2)])
+    camera_position = np.array([random.uniform(cam_pos_range[i][0], cam_pos_range[i][1]) for i in range(2)])
     return {'cx': camera_position[0], 'cy': camera_position[1], 'theta': theta}
 
 
@@ -236,7 +265,18 @@ def update_visibility_field_py(density_field, visibility_field, aabb, cam_res, c
                 p += step_size * dir
 
 
+def get_updated_visibility_field(visibility_field, transmittance_volume):
+    #return (visibility_field + transmittance_volume).clip(0, 1)
+    #non_visibility_field = 1.0 - visibility_field
+    #non_visibility_field = non_visibility_field * (1.0 - 0.5 * transmittance_volume)
+    #return 1.0 - non_visibility_field
+    return (visibility_field + 0.5 * transmittance_volume).clip(0, 1)
+
+
 if __name__ == '__main__':
+    if len(sys.argv) > 1:
+        random.seed(int(sys.argv[1]))
+        pylimbo.seed_random(17)
     res = 128
     cam_res = 512
     #density_field = create_density_field_empty_circle(res)
@@ -254,11 +294,13 @@ if __name__ == '__main__':
     use_python_bos_optimizer = False
     use_visibility_aware_sampling = False
     shall_sample_completely_random_views = False
+    shall_sample_regular = False
     #num_sampled_test_views = 128
     num_sampled_test_views = 256
     gains = np.zeros(num_sampled_test_views)
 
-    num_frames = 16
+    num_frames = 32
+    sample_idx = 0
     for i in range(num_frames):
         if use_mixed_mode:
             use_visibility_aware_sampling = i >= num_frames // 2
@@ -274,14 +316,17 @@ if __name__ == '__main__':
                     while not is_valid:
                         if shall_sample_completely_random_views:
                             pose = sample_random_view(aabb)
-                        else:
+                        elif not shall_sample_regular:
                             pose = sample_view_matrix_circle(aabb)
+                        else:
+                            pose = sample_view_matrix_circle_regular(aabb, sample_idx)
+                            sample_idx += 1
                         is_valid = check_camera_is_valid(occupation_volume, aabb, pose['cx'], pose['cx'], fov)
                     cam_pos = np.array([pose['cx'], pose['cy']], dtype=np.float32)
                     transmittance_volume = np.zeros((res, res), dtype=np.float32)
                     pydens2d.update_visibility_field(
                         density_field, transmittance_volume, aabb, cam_res, cam_pos, pose['theta'], fov)
-                    gains[view_idx] = (((visibility_field + transmittance_volume).clip(0, 1) - visibility_field) * occupation_volume).sum()
+                    gains[view_idx] = ((get_updated_visibility_field(visibility_field, transmittance_volume) - visibility_field) * occupation_volume).sum()
                     tested_poses.append(pose)
                 # Get the best view
                 idx = gains.argmax().item()
@@ -298,7 +343,7 @@ if __name__ == '__main__':
                     transmittance_volume = np.zeros((res, res), dtype=np.float32)
                     pydens2d.update_visibility_field(
                         density_field, transmittance_volume, aabb, cam_res, cam_pos, pose['theta'], fov)
-                    gain = (((visibility_field + transmittance_volume).clip(0, 1) - visibility_field) * occupation_volume).sum()
+                    gain = ((get_updated_visibility_field(visibility_field, transmittance_volume) - visibility_field) * occupation_volume).sum()
                     sampled_poses.append(pose)
                     sampled_poses_gain.append(gain)
                     return gain
@@ -354,7 +399,7 @@ if __name__ == '__main__':
             transmittance_volume = np.zeros((res, res), dtype=np.float32)
             pydens2d.update_visibility_field(
                 density_field, transmittance_volume, aabb, cam_res, cam_pos, best_pose['theta'], fov)
-            visibility_field = (visibility_field + transmittance_volume).clip(0, 1)
+            visibility_field = get_updated_visibility_field(visibility_field, transmittance_volume)
             camera_poses.append(best_pose)
 
             #plt.plot(range(len(sampled_poses_gain)), sampled_poses_gain)
@@ -367,13 +412,16 @@ if __name__ == '__main__':
             while not is_valid:
                 if shall_sample_completely_random_views:
                     pose = sample_random_view(aabb)
-                else:
+                elif not shall_sample_regular:
                     pose = sample_view_matrix_circle(aabb)
+                else:
+                    pose = sample_view_matrix_circle_regular(aabb, sample_idx)
+                    sample_idx += 1
                 is_valid = check_camera_is_valid(occupation_volume, aabb, pose['cx'], pose['cx'], fov)
             cam_pos = np.array([pose['cx'], pose['cy']], dtype=np.float32)
             transmittance_volume = np.zeros((res, res), dtype=np.float32)
             pydens2d.update_visibility_field(density_field, transmittance_volume, aabb, cam_res, cam_pos, pose['theta'], fov)
-            visibility_field = (visibility_field + transmittance_volume).clip(0, 1)
+            visibility_field = get_updated_visibility_field(visibility_field, transmittance_volume)
             camera_poses.append(pose)
 
     color_field = np.zeros((res, res, 3), dtype=np.ubyte)
@@ -419,5 +467,7 @@ if __name__ == '__main__':
     ax.set_xlim([-res, 2 * res])
     ax.set_ylim([-res, 2 * res])
     plt.tight_layout()
-    plt.savefig('out.pdf')
-    plt.show()
+    #plt.savefig('out.pdf')
+    plt.savefig('out.png')
+    if len(sys.argv) <= 1:
+        plt.show()

@@ -43,6 +43,9 @@ PYBIND11_MODULE(pylimbo, m) {
     m.def("maximize", maximize,
           "Applies Bayesian optimization.",
           py::arg("settings"), py::arg("init_points"), py::arg("callback"));
+    m.def("seed_random", seedRandom,
+          "Sets seed for the random number generator.",
+          py::arg("seed_value"));
 }
 
 namespace BayOpt {
@@ -165,3 +168,8 @@ std::pair<float, OptParams> maximize(
     optimizer.optimize(eval);
     return std::make_pair(eval.bestValue, eval.bestParams);
 }
+
+void seedRandom(int seedValue) {
+    nlopt_srand(seedValue);
+}
+

@@ -47,4 +47,6 @@ std::pair<float, OptParams> maximize(
         BayOptSettings settings, const std::vector<OptParams>& initPoints,
         std::function<float(const OptParams&)> callback);
 
+void seedRandom(int seedValue);
+
 #endif //PYCORIANDER_PYCORIANDER_HPP

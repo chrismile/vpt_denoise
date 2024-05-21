@@ -441,6 +441,7 @@ def check_camera_is_valid(occupation_volume, aabb, view_matrix, inverse_view_mat
 
 
 if __name__ == '__main__':
+    #random.seed(17)
     cuda_device_idx = 0
     vulkan_device_idx = 0
     cpu_device = torch.device('cpu')

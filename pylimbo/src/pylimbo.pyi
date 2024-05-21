@@ -4,7 +4,8 @@ import pylimbo
 import typing
 
 __all__ = [
-    "maximize"
+    "maximize",
+    "seed_random"
 ]
 
 
@@ -16,6 +17,11 @@ class BayOptSettings:
     ucb_kappa: float = ...
 
 def maximize(settings: BayOptSettings, init_points: list, callback: typing.Callable) -> tuple:
+    """
+    Applies Bayesian optimization (single-threaded).
+    """
+
+def seed_random(seed_value: int) -> tuple:
     """
     Applies Bayesian optimization (single-threaded).
     """
