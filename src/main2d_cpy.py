@@ -33,6 +33,7 @@ import json
 import pathlib
 import sys
 
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 from numba import njit
@@ -274,6 +275,8 @@ def get_updated_visibility_field(visibility_field, transmittance_volume):
 
 
 if __name__ == '__main__':
+    matplotlib.rcParams.update({'font.family': 'Linux Biolinum O'})
+    matplotlib.rcParams.update({'font.size': 15.0})
     if len(sys.argv) > 1:
         random.seed(int(sys.argv[1]))
     if len(sys.argv) > 2:
@@ -286,41 +289,24 @@ if __name__ == '__main__':
     project_dir = pathlib.Path(__file__).parent.parent.resolve()
     density_field = create_density_field_from_svg(res, f'{project_dir}/data/concave.svg')
     occupation_volume = density_field > 0.0
-    non_empty_counter = 0
-    for yi in range(res):
-        for xi in range(res):
-            if density_field[yi, xi] > 0.0:
-                non_empty_counter += 1
-    non_empty_voxel_pos_field = np.empty((non_empty_counter, 2), dtype=np.int32)
-    non_empty_counter = 0
-    for yi in range(res):
-        for xi in range(res):
-            if density_field[yi, xi] > 0.0:
-                non_empty_voxel_pos_field[non_empty_counter, 0] = xi
-                non_empty_voxel_pos_field[non_empty_counter, 1] = yi
-                non_empty_counter += 1
 
     aabb = np.array([-1.0, 1.0, -1.0, 1.0], np.float32)
-    #visibility_field = np.zeros((res, res), dtype=np.float32)
-    angular_bin_size = 8
-    obs_freq_field = np.zeros((res, res), dtype=np.int32)
-    angular_obs_freq_field = np.zeros((res, res, angular_bin_size), dtype=np.int32)
-    gamma = 0.25
+    visibility_field = np.zeros((res, res), dtype=np.float32)
 
     fov = 0.5
     camera_poses = []
     use_mixed_mode = False
     use_bos = False
     use_python_bos_optimizer = False
-    use_visibility_aware_sampling = True
-    shall_sample_completely_random_views = True
+    use_visibility_aware_sampling = False
+    shall_sample_completely_random_views = False
     shall_sample_regular = False
     #num_sampled_test_views = 128
     num_sampled_test_views_initial = 256
     num_sampled_test_views = 256
     gains = np.zeros(num_sampled_test_views)
 
-    num_frames = 16
+    num_frames = 32
     sample_idx = 0
     for i in range(num_frames):
         if use_mixed_mode:
@@ -344,13 +330,10 @@ if __name__ == '__main__':
                         sample_idx += 1
                         is_valid = check_camera_is_valid(occupation_volume, aabb, pose['cx'], pose['cx'], fov)
                     cam_pos = np.array([pose['cx'], pose['cy']], dtype=np.float32)
-                    obs_freq_field_cpy = obs_freq_field.copy()
-                    angular_obs_freq_field_cpy = angular_obs_freq_field.copy()
-                    pydens2d.update_observation_frequency_fields(
-                        density_field, obs_freq_field_cpy, angular_obs_freq_field_cpy,
-                        aabb, cam_res, cam_pos, pose['theta'], fov)
-                    gains[view_idx] = pydens2d.compute_energy(
-                        i + 1, gamma, non_empty_voxel_pos_field, obs_freq_field_cpy, angular_obs_freq_field_cpy)
+                    transmittance_volume = np.zeros((res, res), dtype=np.float32)
+                    pydens2d.update_visibility_field(
+                        density_field, transmittance_volume, aabb, cam_res, cam_pos, pose['theta'], fov)
+                    gains[view_idx] = ((get_updated_visibility_field(visibility_field, transmittance_volume) - visibility_field) * occupation_volume).sum()
                     tested_poses.append(pose)
                 # Get the best view
                 idx = gains.argmax().item()
@@ -364,13 +347,10 @@ if __name__ == '__main__':
                     if not is_valid:
                         return 0.0
                     cam_pos = np.array([pose['cx'], pose['cy']], dtype=np.float32)
-                    obs_freq_field_cpy = obs_freq_field.copy()
-                    angular_obs_freq_field_cpy = angular_obs_freq_field.copy()
-                    pydens2d.update_observation_frequency_fields(
-                        density_field, obs_freq_field_cpy, angular_obs_freq_field_cpy,
-                        aabb, cam_res, cam_pos, pose['theta'], fov)
-                    gain = pydens2d.compute_energy(
-                        i + 1, gamma, non_empty_voxel_pos_field, obs_freq_field_cpy, angular_obs_freq_field_cpy)
+                    transmittance_volume = np.zeros((res, res), dtype=np.float32)
+                    pydens2d.update_visibility_field(
+                        density_field, transmittance_volume, aabb, cam_res, cam_pos, pose['theta'], fov)
+                    gain = ((get_updated_visibility_field(visibility_field, transmittance_volume) - visibility_field) * occupation_volume).sum()
                     sampled_poses.append(pose)
                     sampled_poses_gain.append(gain)
                     return gain
@@ -423,9 +403,10 @@ if __name__ == '__main__':
                         settings, init_points, sample_camera_pose_gain_function_params)
 
             cam_pos = np.array([best_pose['cx'], best_pose['cy']], dtype=np.float32)
-            pydens2d.update_observation_frequency_fields(
-                density_field, obs_freq_field, angular_obs_freq_field,
-                aabb, cam_res, cam_pos, best_pose['theta'], fov)
+            transmittance_volume = np.zeros((res, res), dtype=np.float32)
+            pydens2d.update_visibility_field(
+                density_field, transmittance_volume, aabb, cam_res, cam_pos, best_pose['theta'], fov)
+            visibility_field = get_updated_visibility_field(visibility_field, transmittance_volume)
             camera_poses.append(best_pose)
 
             #plt.plot(range(len(sampled_poses_gain)), sampled_poses_gain)
@@ -445,16 +426,16 @@ if __name__ == '__main__':
                     sample_idx += 1
                 is_valid = check_camera_is_valid(occupation_volume, aabb, pose['cx'], pose['cx'], fov)
             cam_pos = np.array([pose['cx'], pose['cy']], dtype=np.float32)
-            pydens2d.update_observation_frequency_fields(
-                density_field, obs_freq_field, angular_obs_freq_field,
-                aabb, cam_res, cam_pos, pose['theta'], fov)
+            transmittance_volume = np.zeros((res, res), dtype=np.float32)
+            pydens2d.update_visibility_field(density_field, transmittance_volume, aabb, cam_res, cam_pos, pose['theta'], fov)
+            visibility_field = get_updated_visibility_field(visibility_field, transmittance_volume)
             camera_poses.append(pose)
 
     color_field = np.zeros((res, res, 3), dtype=np.ubyte)
     for yi in range(res):
         for xi in range(res):
             color = np.array([255, 255, 255], dtype=np.ubyte)
-            v = obs_freq_field[yi, xi] > 0.5
+            v = visibility_field[yi, xi] > 0.0
             d = density_field[yi, xi] > 0.0
             if v and d:
                 color[:] = [220, 0, 0]
@@ -465,12 +446,6 @@ if __name__ == '__main__':
             elif not v and not d:
                 color[:] = [255, 255, 255]
             color_field[yi, xi, :] = color[:]
-
-    print('Energy at end:')
-    energy_end = pydens2d.compute_energy(
-        num_frames, gamma, non_empty_voxel_pos_field, obs_freq_field, angular_obs_freq_field)
-    print(energy_end)
-    print()
 
     # Plot cameras & density
     plt.imshow(color_field, interpolation='nearest')
@@ -496,10 +471,16 @@ if __name__ == '__main__':
         tri = plt.Polygon(points, facecolor="none", edgecolor=camera_color)
         plt.gca().add_patch(tri)
     ax = plt.gca()
-    ax.set_xlim([-res, 2 * res])
-    ax.set_ylim([-res, 2 * res])
+    if res == 128:
+        ax.set_xlim([-84, 212])
+        ax.set_ylim([-84, 212])
+        ax.get_xaxis().set_visible(False)
+        ax.get_yaxis().set_visible(False)
+    else:
+        ax.set_xlim([-res, 2 * res])
+        ax.set_ylim([-res, 2 * res])
     plt.tight_layout()
     #plt.savefig('out.pdf')
-    plt.savefig('out.png')
+    plt.savefig('out.png', bbox_inches='tight', pad_inches=0.01, dpi=200)
     if len(sys.argv) <= 1:
         plt.show()

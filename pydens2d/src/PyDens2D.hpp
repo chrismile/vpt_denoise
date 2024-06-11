@@ -40,4 +40,17 @@ void updateVisibilityField(
         py::EigenDRef<Eigen::VectorXf> aabb,
         int camRes, Eigen::Ref<Eigen::VectorXf> camPos, float theta, float fov);
 
+float computeEnergy(
+        int N, float gamma,
+        py::EigenDRef<Eigen::MatrixXi> nonEmptyVoxelPosField,
+        py::array_t<int> obsFreqField,
+        py::array_t<int> angularObsFreqField);
+
+void updateObservationFrequencyFields(
+        py::EigenDRef<Eigen::MatrixXf> densityField,
+        py::array_t<int> obsFreqField,
+        py::array_t<int> angularObsFreqField,
+        py::EigenDRef<Eigen::VectorXf> aabb,
+        int camRes, Eigen::Ref<Eigen::VectorXf> camPos, float theta, float fov);
+
 #endif //PYCORIANDER_PYCORIANDER_HPP
