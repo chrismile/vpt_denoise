@@ -136,7 +136,7 @@ float computeEnergy(
             TV += std::abs(float(angularObsFreqFieldAccessor(yi, xi, bi)) * fN - fB);
         }
         TV *= 0.5f;
-        energyAngularObsFreq += 1 - TV;
+        energyAngularObsFreq += 1.0f - TV;
     }
     return energyObsFreq + energyAngularObsFreq;
 }
