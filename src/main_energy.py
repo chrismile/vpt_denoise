@@ -30,6 +30,8 @@ import datetime
 import queue
 import json
 import pathlib
+import matplotlib
+from matplotlib import ticker
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.spatial.transform import Rotation as Rotation
@@ -157,8 +159,8 @@ def jitter_direction(camera_forward, jitter_rad):
     q_xyz = np.cross(v1, v2)
     q_w = np.inner(v1, v1) * np.inner(v2, v2) + np.dot(v1, v2)
     transform = Rotation.from_quat(np.array([q_xyz[0], q_xyz[1], q_xyz[2], q_w]))
-    phi = np.random.uniform(0.0, 2.0 * np.pi)
-    theta = np.random.uniform(0, jitter_rad)
+    phi = random.uniform(0.0, 2.0 * np.pi)
+    theta = random.uniform(0, jitter_rad)
     vec_spherical = np.array([np.sin(theta) * np.cos(phi), np.sin(theta) * np.sin(phi), np.cos(theta)])
     vec_new = transform.apply(vec_spherical)
     return vec_new
@@ -262,12 +264,12 @@ def get_position_random_range(aabb):
 
 def sample_random_view(aabb):
     # https://stackoverflow.com/questions/31600717/how-to-generate-a-random-quaternion-quickly
-    rvec = np.random.uniform(0.0, 1.0, 3)
+    rvec = [random.uniform(0.0, 1.0), random.uniform(0.0, 1.0), random.uniform(0.0, 1.0)]
     u = rvec[0]
     v = rvec[1]
     w = rvec[2]
     cam_pos_range = get_position_random_range(aabb)
-    camera_position = np.array([np.random.uniform(cam_pos_range[i][0], cam_pos_range[i][1]) for i in range(3)])
+    camera_position = np.array([random.uniform(cam_pos_range[i][0], cam_pos_range[i][1]) for i in range(3)])
     params = {
         'cx': camera_position[0], 'cy': camera_position[1], 'cz': camera_position[2],
         'u': u, 'v': v, 'w': w
@@ -440,178 +442,17 @@ def check_camera_is_valid(occupation_volume, aabb, view_matrix, inverse_view_mat
     return True
 
 
-if __name__ == '__main__':
-    #random.seed(17)
-    cuda_device_idx = 0
-    vulkan_device_idx = 0
-    cpu_device = torch.device('cpu')
-    cuda_device = torch.device(f'cuda:{cuda_device_idx}' if torch.cuda.is_available() else 'cpu')
-    vulkan_device = torch.device(f'vulkan:{vulkan_device_idx}' if torch.is_vulkan_available() else 'cpu')
-
-    #print(torch.__version__)
-    #print(torch.is_vulkan_available())
-    #print(torch.cuda.is_available())
-    #print(cpu_device)
-    #print(cuda_device)
-    #print(vulkan_device)
-
-    test_mode = False
-    image_width = 1024
-    image_height = 1024
-    aspect = image_width / image_height
-
-    test_tensor_cpu = torch.ones((4, image_height, image_width), dtype=torch.float32, device=cpu_device)
-    test_tensor_cuda = torch.ones((4, image_height, image_width), dtype=torch.float32, device=cuda_device)
-    #test_tensor_vulkan = torch.ones(1, dtype=torch.float32, device=vulkan_device)
-    #test_tensor_vulkan = test_tensor_cpu.to(vulkan_device)
-    print(test_tensor_cpu)
-    print(test_tensor_cuda)
-    #print(test_tensor_vulkan)
-    vpt_renderer = VolumetricPathTracingRenderer()
-    render_module = vpt_renderer.module()
-
-    out_dir = f'out_{datetime.datetime.now():%Y-%m-%d_%H:%M:%S}'
-    pathlib.Path(out_dir).mkdir(exist_ok=True)
-    #with open(f'{out_dir}/extrinsics.txt', 'w') as f:
-    #    f.write(f'{vpt_renderer.module().get_camera_fovy()}')
-    camera_infos = []
-
-    #test_case = 'Wholebody'
-    #test_case = 'Angiography'
-    #test_case = 'HeadDVR'
-    test_case = 'HollowSphere'
-
+def run_tests(use_bos=False, num_sampled_test_views=128):
     use_python_bos_optimizer = False
-
-    data_dir = '/mnt/data/Flow/Scalar/'
-    if not os.path.isdir(data_dir):
-        data_dir = '/media/christoph/Elements/Datasets/Scalar/'
-    if not os.path.isdir(data_dir):
-        data_dir = '/home/christoph/datasets/Flow/Scalar/'
-    if test_case == 'Wholebody':
-        vpt_renderer.module().load_volume_file(
-            data_dir + 'Wholebody [512 512 3172] (CT)/wholebody.dat')
-    elif test_case == 'Angiography':
-        vpt_renderer.module().load_volume_file(
-            data_dir + 'Head [416 512 112] (MRT Angiography)/mrt8_angio.dat')
-    elif test_case == 'HeadDVR':
-        vpt_renderer.module().load_volume_file(
-            data_dir + 'Head [256 256 256] (MR)/Head_256x256x256.dat')
-    elif test_case == 'HollowSphere':
-        vpt_renderer.module().load_volume_file(
-            str(pathlib.Path.home()) + '/datasets/Toy/vpt/hollowsphere.dat')
-    vpt_renderer.module().load_environment_map(
-        str(pathlib.Path.home())
-        + '/Programming/C++/CloudRendering/Data/CloudDataSets/env_maps/small_empty_room_1_4k_blurred.exr')
-    vpt_renderer.module().set_use_transfer_function(True)
-
-    #mode = 'Delta Tracking'
-    mode = 'Next Event Tracking'
-    #mode = 'Isosurfaces'
-    if test_case == 'Wholebody':
-        vpt_renderer.module().load_transfer_function_file(
-            str(pathlib.Path.home()) + '/Programming/C++/CloudRendering/Data/TransferFunctions/TF_Wholebody3.xml')
-        vpt_renderer.module().load_transfer_function_file_gradient(
-            str(pathlib.Path.home()) + '/Programming/C++/CloudRendering/Data/TransferFunctions/TF_WholebodyGrad1.xml')
-    elif test_case == 'Angiography':
-        vpt_renderer.module().load_transfer_function_file(
-            str(pathlib.Path.home()) + '/Programming/C++/CloudRendering/Data/TransferFunctions/HeadAngioDens.xml')
-        vpt_renderer.module().load_transfer_function_file_gradient(
-            str(pathlib.Path.home()) + '/Programming/C++/CloudRendering/Data/TransferFunctions/HeadAngioGrad.xml')
-    elif test_case == 'HeadDVR':
-        vpt_renderer.module().load_transfer_function_file(
-            str(pathlib.Path.home()) + '/Programming/C++/CloudRendering/Data/TransferFunctions/HeadDVR.xml')
-        mode = 'Ray Marching (Emission/Absorption)'
-    elif test_case == 'HollowSphere':
-        vpt_renderer.module().load_transfer_function_file(
-            str(pathlib.Path.home()) + '/Programming/C++/CloudRendering/Data/TransferFunctions/HollowSphere.xml')
-
-    denoiser_name = 'None'
-    if mode != 'Ray Marching (Emission/Absorption)':
-        denoiser_name = 'OptiX Denoiser'
-    if denoiser_name != 'None':
-        vpt_renderer.module().set_denoiser(denoiser_name)
-
-    spp = 256
-    if mode == 'Delta Tracking':
-        spp = 16384
-    elif mode == 'Next Event Tracking':
-        spp = 256
-    elif mode == 'Isosurfaces':
-        spp = 256
-    elif mode == 'Ray Marching (Emission/Absorption)':
-        spp = 16
-    vpt_renderer.set_num_frames(spp)
-    #if denoiser_name == 'None':
-    #    if mode == 'Delta Tracking':
-    #        vpt_renderer.set_num_frames(16384)
-    #    elif mode == 'Next Event Tracking':
-    #        vpt_renderer.set_num_frames(256)
-    #    elif mode == 'Isosurfaces':
-    #        vpt_renderer.set_num_frames(256)
-    #else:
-    #    vpt_renderer.set_num_frames(2)
-    #vpt_renderer.module().set_vpt_mode_from_name('Delta Tracking')
-    vpt_renderer.module().set_vpt_mode_from_name(mode)
-
-    iso_value = 0.0
-    if test_case == 'Wholebody':
-        vpt_renderer.module().set_use_isosurfaces(True)
-        use_gradient_mode = False
-        if use_gradient_mode:
-            vpt_renderer.module().set_isosurface_type('Gradient')
-            iso_value = 0.002
-        else:
-            vpt_renderer.module().set_isosurface_type('Density')
-            iso_value = 0.3
-        vpt_renderer.module().set_iso_value(iso_value)
-    elif test_case == 'Angiography':
-        vpt_renderer.module().set_use_isosurfaces(True)
-        vpt_renderer.module().set_isosurface_type('Gradient')
-        iso_value = 0.05
-        vpt_renderer.module().set_iso_value(iso_value)
-    elif test_case == 'HeadDVR':
-        vpt_renderer.module().set_use_isosurfaces(False)
-        vpt_renderer.module().set_extinction_scale(10000.0)
-    elif test_case == 'HollowSphere':
-        vpt_renderer.module().set_use_isosurfaces(False)
-
-    vpt_renderer.module().set_iso_surface_color([0.4, 0.4, 0.4])
-    vpt_renderer.module().set_surface_brdf('Lambertian')
-    #vpt_renderer.module().set_surface_brdf('Blinn Phong')
-    used_feature_maps = ['Cloud Only', 'Background', 'Depth Blended']
-    feature_maps_vis = ['Transmittance Volume']
-    vpt_renderer.module().set_use_feature_maps(used_feature_maps)
-    vpt_renderer.module().set_output_foreground_map(True)
-
-    vpt_renderer.module().set_camera_position([0.0, 0.0, 0.3])
-    vpt_renderer.module().set_camera_target([0.0, 0.0, 0.0])
-
-    aabb = vpt_renderer.module().get_render_bounding_box()
-    rx = 0.5 * (aabb[1] - aabb[0])
-    ry = 0.5 * (aabb[3] - aabb[2])
-    rz = 0.5 * (aabb[5] - aabb[4])
-    radii_sorted = sorted([rx, ry, rz])
-    #is_spherical = radii_sorted[2] - radii_sorted[0] < 0.01
-    is_spherical = radii_sorted[2] / radii_sorted[0] < 1.5
-
-    start = time.time()
-
     use_energy_approach = True
     shall_sample_completely_random_views = True
     use_mixed_mode = False
     use_visibility_aware_sampling = True
     if test_case == 'HeadDVR':
         use_visibility_aware_sampling = False
-    ds = 2
-    vpt_renderer.module().set_secondary_volume_downscaling_factor(ds)
-    use_bos = False  # Bayesian optimal sampling
     # use_bos = use_visibility_aware_sampling  # Bayesian optimal sampling
-    num_sampled_test_views = 128
-    volume_voxel_size = vpt_renderer.module().get_volume_voxel_size()
-    vis_volume_voxel_size = [iceil(x, ds) for x in volume_voxel_size]
+
     vis = None
-    occupation_volume = None
     gains = None
     if use_visibility_aware_sampling:
         if not use_energy_approach:
@@ -619,17 +460,6 @@ if __name__ == '__main__':
                 size=(vis_volume_voxel_size[0], vis_volume_voxel_size[1], vis_volume_voxel_size[2]),
                 dtype=torch.float32, device=cuda_device)
         gains = torch.zeros(num_sampled_test_views, device=cpu_device)
-    # We need to render one frame before being able to call 'compute_occupation_volume'
-    vpt_renderer.set_num_frames(1)
-    vpt_renderer.module().set_use_feature_maps(feature_maps_vis)
-    vpt_test_tensor_cuda = vpt_renderer(test_tensor_cuda)
-    vpt_test_tensor_cuda = None
-    occupation_volume = vpt_renderer.module().compute_occupation_volume(test_tensor_cuda, ds, 3).cpu().numpy()
-    occupation_volume_narrow = vpt_renderer.module().compute_occupation_volume(test_tensor_cuda, ds, 0)
-    vpt_renderer.module().set_use_feature_maps(used_feature_maps)
-    #occupation_volume_array = occupation_volume.cpu().numpy().astype(np.float32)
-    #save_nc('/home/christoph/datasets/Test/occupation.nc', occupation_volume_array)
-    fovy = vpt_renderer.module().get_camera_fovy()
 
     num_bins_x = 6
     num_bins_y = 4
@@ -646,7 +476,6 @@ if __name__ == '__main__':
             size=(vis_volume_voxel_size[0], vis_volume_voxel_size[1], vis_volume_voxel_size[2], num_bins),
             dtype=torch.float32, device=cuda_device)
 
-    num_frames = 32
     for i in range(num_frames):
         if use_mixed_mode:
             use_visibility_aware_sampling = i >= num_frames // 2
@@ -851,7 +680,246 @@ if __name__ == '__main__':
     with open(f'{out_dir}/cameras.json', 'w') as f:
         json.dump(camera_infos, f, ensure_ascii=False, indent=4)
 
-    plt.plot([i for i in range(num_frames)], energy_term_list)
-    plt.show()
+    return np.array(energy_term_list), end - start
+
+
+if __name__ == '__main__':
+    random.seed(31)
+    pylimbo.seed_random(37)
+    cuda_device_idx = 0
+    vulkan_device_idx = 0
+    cpu_device = torch.device('cpu')
+    cuda_device = torch.device(f'cuda:{cuda_device_idx}' if torch.cuda.is_available() else 'cpu')
+    vulkan_device = torch.device(f'vulkan:{vulkan_device_idx}' if torch.is_vulkan_available() else 'cpu')
+
+    #print(torch.__version__)
+    #print(torch.is_vulkan_available())
+    #print(torch.cuda.is_available())
+    #print(cpu_device)
+    #print(cuda_device)
+    #print(vulkan_device)
+
+    test_mode = False
+    image_width = 1024
+    image_height = 1024
+    aspect = image_width / image_height
+
+    test_tensor_cpu = torch.ones((4, image_height, image_width), dtype=torch.float32, device=cpu_device)
+    test_tensor_cuda = torch.ones((4, image_height, image_width), dtype=torch.float32, device=cuda_device)
+    #test_tensor_vulkan = torch.ones(1, dtype=torch.float32, device=vulkan_device)
+    #test_tensor_vulkan = test_tensor_cpu.to(vulkan_device)
+    print(test_tensor_cpu)
+    print(test_tensor_cuda)
+    #print(test_tensor_vulkan)
+    vpt_renderer = VolumetricPathTracingRenderer()
+    render_module = vpt_renderer.module()
+
+    out_dir = f'out_{datetime.datetime.now():%Y-%m-%d_%H:%M:%S}'
+    pathlib.Path(out_dir).mkdir(exist_ok=True)
+    #with open(f'{out_dir}/extrinsics.txt', 'w') as f:
+    #    f.write(f'{vpt_renderer.module().get_camera_fovy()}')
+    camera_infos = []
+
+    test_case = 'Wholebody'
+    #test_case = 'Angiography'
+    #test_case = 'HeadDVR'
+    #test_case = 'HollowSphere'
+
+    data_dir = '/mnt/data/Flow/Scalar/'
+    if not os.path.isdir(data_dir):
+        data_dir = '/home/christoph/datasets/Scalar/'
+    if not os.path.isdir(data_dir):
+        data_dir = '/media/christoph/Elements/Datasets/Scalar/'
+    if not os.path.isdir(data_dir):
+        data_dir = '/home/christoph/datasets/Flow/Scalar/'
+    if test_case == 'Wholebody':
+        vpt_renderer.module().load_volume_file(
+            data_dir + 'Wholebody [512 512 3172] (CT)/wholebody.dat')
+    elif test_case == 'Angiography':
+        vpt_renderer.module().load_volume_file(
+            data_dir + 'Head [416 512 112] (MRT Angiography)/mrt8_angio.dat')
+    elif test_case == 'HeadDVR':
+        vpt_renderer.module().load_volume_file(
+            data_dir + 'Head [256 256 256] (MR)/Head_256x256x256.dat')
+    elif test_case == 'HollowSphere':
+        vpt_renderer.module().load_volume_file(
+            str(pathlib.Path.home()) + '/datasets/Toy/vpt/hollowsphere.dat')
+    vpt_renderer.module().load_environment_map(
+        str(pathlib.Path.home())
+        + '/Programming/C++/CloudRendering/Data/CloudDataSets/env_maps/small_empty_room_1_4k_blurred.exr')
+    vpt_renderer.module().set_use_transfer_function(True)
+
+    #mode = 'Delta Tracking'
+    mode = 'Next Event Tracking'
+    #mode = 'Isosurfaces'
+    if test_case == 'Wholebody':
+        vpt_renderer.module().load_transfer_function_file(
+            str(pathlib.Path.home()) + '/Programming/C++/CloudRendering/Data/TransferFunctions/TF_Wholebody3.xml')
+        vpt_renderer.module().load_transfer_function_file_gradient(
+            str(pathlib.Path.home()) + '/Programming/C++/CloudRendering/Data/TransferFunctions/TF_WholebodyGrad1.xml')
+    elif test_case == 'Angiography':
+        vpt_renderer.module().load_transfer_function_file(
+            str(pathlib.Path.home()) + '/Programming/C++/CloudRendering/Data/TransferFunctions/HeadAngioDens.xml')
+        vpt_renderer.module().load_transfer_function_file_gradient(
+            str(pathlib.Path.home()) + '/Programming/C++/CloudRendering/Data/TransferFunctions/HeadAngioGrad.xml')
+    elif test_case == 'HeadDVR':
+        vpt_renderer.module().load_transfer_function_file(
+            str(pathlib.Path.home()) + '/Programming/C++/CloudRendering/Data/TransferFunctions/HeadDVR.xml')
+        mode = 'Ray Marching (Emission/Absorption)'
+    elif test_case == 'HollowSphere':
+        vpt_renderer.module().load_transfer_function_file(
+            str(pathlib.Path.home()) + '/Programming/C++/CloudRendering/Data/TransferFunctions/HollowSphere.xml')
+
+    denoiser_name = 'None'
+    if mode != 'Ray Marching (Emission/Absorption)':
+        denoiser_name = 'OptiX Denoiser'
+    if denoiser_name != 'None':
+        vpt_renderer.module().set_denoiser(denoiser_name)
+
+    spp = 256
+    if mode == 'Delta Tracking':
+        spp = 16384
+    elif mode == 'Next Event Tracking':
+        spp = 256
+    elif mode == 'Isosurfaces':
+        spp = 256
+    elif mode == 'Ray Marching (Emission/Absorption)':
+        spp = 16
+    vpt_renderer.set_num_frames(spp)
+    #if denoiser_name == 'None':
+    #    if mode == 'Delta Tracking':
+    #        vpt_renderer.set_num_frames(16384)
+    #    elif mode == 'Next Event Tracking':
+    #        vpt_renderer.set_num_frames(256)
+    #    elif mode == 'Isosurfaces':
+    #        vpt_renderer.set_num_frames(256)
+    #else:
+    #    vpt_renderer.set_num_frames(2)
+    #vpt_renderer.module().set_vpt_mode_from_name('Delta Tracking')
+    vpt_renderer.module().set_vpt_mode_from_name(mode)
+
+    iso_value = 0.0
+    if test_case == 'Wholebody':
+        vpt_renderer.module().set_use_isosurfaces(True)
+        use_gradient_mode = False
+        if use_gradient_mode:
+            vpt_renderer.module().set_isosurface_type('Gradient')
+            iso_value = 0.002
+        else:
+            vpt_renderer.module().set_isosurface_type('Density')
+            iso_value = 0.3
+        vpt_renderer.module().set_iso_value(iso_value)
+    elif test_case == 'Angiography':
+        vpt_renderer.module().set_use_isosurfaces(True)
+        vpt_renderer.module().set_isosurface_type('Gradient')
+        iso_value = 0.05
+        vpt_renderer.module().set_iso_value(iso_value)
+    elif test_case == 'HeadDVR':
+        vpt_renderer.module().set_use_isosurfaces(False)
+        vpt_renderer.module().set_extinction_scale(10000.0)
+    elif test_case == 'HollowSphere':
+        vpt_renderer.module().set_use_isosurfaces(False)
+
+    vpt_renderer.module().set_iso_surface_color([0.4, 0.4, 0.4])
+    vpt_renderer.module().set_surface_brdf('Lambertian')
+    #vpt_renderer.module().set_surface_brdf('Blinn Phong')
+    used_feature_maps = ['Cloud Only', 'Background', 'Depth Blended']
+    feature_maps_vis = ['Transmittance Volume']
+    vpt_renderer.module().set_use_feature_maps(used_feature_maps)
+    vpt_renderer.module().set_output_foreground_map(True)
+
+    vpt_renderer.module().set_camera_position([0.0, 0.0, 0.3])
+    vpt_renderer.module().set_camera_target([0.0, 0.0, 0.0])
+
+    aabb = vpt_renderer.module().get_render_bounding_box()
+    rx = 0.5 * (aabb[1] - aabb[0])
+    ry = 0.5 * (aabb[3] - aabb[2])
+    rz = 0.5 * (aabb[5] - aabb[4])
+    radii_sorted = sorted([rx, ry, rz])
+    #is_spherical = radii_sorted[2] - radii_sorted[0] < 0.01
+    is_spherical = radii_sorted[2] / radii_sorted[0] < 1.5
+
+    start = time.time()
+
+    ds = 3
+    vpt_renderer.module().set_secondary_volume_downscaling_factor(ds)
+    volume_voxel_size = vpt_renderer.module().get_volume_voxel_size()
+    vis_volume_voxel_size = [iceil(x, ds) for x in volume_voxel_size]
+    occupation_volume = None
+
+    # We need to render one frame before being able to call 'compute_occupation_volume'
+    vpt_renderer.set_num_frames(1)
+    vpt_renderer.module().set_use_feature_maps(feature_maps_vis)
+    vpt_test_tensor_cuda = vpt_renderer(test_tensor_cuda)
+    vpt_test_tensor_cuda = None
+    occupation_volume = vpt_renderer.module().compute_occupation_volume(test_tensor_cuda, ds, 3).cpu().numpy()
+    occupation_volume_narrow = vpt_renderer.module().compute_occupation_volume(test_tensor_cuda, ds, 0)
+    vpt_renderer.module().set_use_feature_maps(used_feature_maps)
+    #occupation_volume_array = occupation_volume.cpu().numpy().astype(np.float32)
+    #save_nc('/home/christoph/datasets/Test/occupation.nc', occupation_volume_array)
+    fovy = vpt_renderer.module().get_camera_fovy()
+    num_frames = 32
+
+    matplotlib.rcParams.update({'font.family': 'Linux Biolinum O'})
+    matplotlib.rcParams.update({'font.size': 17.5})
+
+    test_curve = False
+    if test_curve:
+        energy_term_list_rnd, time_rnd_next = run_tests(use_bos=False, num_sampled_test_views=64)
+        energy_term_list_bos, time_bos_next = run_tests(use_bos=True, num_sampled_test_views=64)
+        plt.plot([i for i in range(num_frames)], energy_term_list_rnd, label="Random")
+        plt.plot([i for i in range(num_frames)], energy_term_list_bos, label="BOS")
+        plt.tight_layout()
+        plt.show()
+    else:
+        n_avg = 4
+        views = [4, 8, 16, 32, 64]
+        #views = [4, 8]
+        views_np = np.array(views, dtype=int)
+        time_rnd = np.zeros(len(views))
+        time_bos = np.zeros(len(views))
+        energy_list_views_rnd = np.zeros(len(views))
+        energy_list_views_bos = np.zeros(len(views))
+        for i, test_views in enumerate(views):
+            for j in range(n_avg):
+                energy_term_list_rnd, time_rnd_next = run_tests(use_bos=False, num_sampled_test_views=test_views)
+                energy_term_list_bos, time_bos_next = run_tests(use_bos=True, num_sampled_test_views=test_views)
+                time_rnd[i] += time_rnd_next
+                time_bos[i] += time_bos_next
+                energy_list_views_rnd[i] += energy_term_list_rnd[-1]
+                energy_list_views_bos[i] += energy_term_list_bos[-1]
+        time_rnd /= len(views)
+        time_bos /= len(views)
+        energy_list_views_rnd /= len(views)
+        energy_list_views_bos /= len(views)
+
+        plt.plot(views_np, energy_list_views_rnd, label="Random")
+        plt.plot(views_np, energy_list_views_bos, label="BOS")
+        plt.xlabel('#Candidate views')
+        plt.ylabel('Energy')
+        plt.xscale('log')
+        plt.gca().xaxis.set_major_formatter(ticker.FuncFormatter(lambda y, _: f'{int(y)}'))
+        plt.minorticks_off()
+        plt.xticks(views_np)
+        #plt.ticklabel_format(axis='x', style='plain')
+        #print(f'Times Rnd (s): {time_rnd}')
+        #print(f'Times BOS (s): {time_bos}')
+        plt.legend(loc="lower right")
+        plt.tight_layout()
+        plt.savefig('maximum.pdf', bbox_inches='tight', pad_inches=0.01)
+        plt.show()
+
+        plt.plot(views_np, time_rnd, label="Random")
+        plt.plot(views_np, time_bos, label="BOS")
+        plt.xlabel('#Candidate views')
+        plt.ylabel('Time (s)')
+        plt.xscale('log')
+        plt.gca().xaxis.set_major_formatter(ticker.FuncFormatter(lambda y, _: f'{int(y)}'))
+        plt.minorticks_off()
+        plt.xticks(views_np)
+        plt.legend(loc="lower right")
+        plt.tight_layout()
+        plt.savefig('time.pdf', bbox_inches='tight', pad_inches=0.01)
+        plt.show()
 
     del vpt_renderer
