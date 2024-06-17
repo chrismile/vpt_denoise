@@ -921,6 +921,8 @@ if __name__ == '__main__':
         energy_list_views_rnd = np.zeros(len(views))
         energy_list_views_bos = np.zeros(len(views))
         for i, test_views in enumerate(views):
+            print()
+            print(f'Starting {test_views} views...')
             for j in range(n_avg):
                 energy_term_list_rnd, time_rnd_next = run_tests(use_bos=False, num_sampled_test_views=test_views)
                 energy_term_list_bos, time_bos_next = run_tests(use_bos=True, num_sampled_test_views=test_views)
