@@ -451,6 +451,7 @@ def run_tests(use_bos=False, num_sampled_test_views=128):
     if test_case == 'HeadDVR':
         use_visibility_aware_sampling = False
     # use_bos = use_visibility_aware_sampling  # Bayesian optimal sampling
+    dont_resample_invalid = True
 
     vis = None
     gains = None
@@ -476,6 +477,8 @@ def run_tests(use_bos=False, num_sampled_test_views=128):
             size=(vis_volume_voxel_size[0], vis_volume_voxel_size[1], vis_volume_voxel_size[2], num_bins),
             dtype=torch.float32, device=cuda_device)
 
+    start = time.time()
+
     for i in range(num_frames):
         if use_mixed_mode:
             use_visibility_aware_sampling = i >= num_frames // 2
@@ -485,7 +488,45 @@ def run_tests(use_bos=False, num_sampled_test_views=128):
             vpt_renderer.set_num_frames(1)
             vpt_renderer.module().set_use_feature_maps(feature_maps_vis)
 
-            if not use_bos:
+            if not use_bos and dont_resample_invalid:
+                gains = []
+                tested_matrices = []
+                sample_idx = 0
+                for view_idx in range(num_sampled_test_views):
+                    is_valid = False
+                    while not is_valid:
+                        if shall_sample_completely_random_views:
+                            view_matrix_array, vm, ivm, _ = sample_random_view(aabb)
+                        elif is_spherical:
+                            view_matrix_array, vm, ivm = sample_view_matrix_circle(aabb)
+                        else:
+                            view_matrix_array, vm, ivm = sample_view_matrix_box(aabb)
+                        sample_idx += 1
+                        is_valid = check_camera_is_valid(occupation_volume, aabb, vm, ivm, fovy, aspect)
+                    if sample_idx > num_sampled_test_views and len(gains) > 1:
+                        break
+                    vpt_renderer.module().overwrite_camera_view_matrix(view_matrix_array)
+                    vpt_test_tensor_cuda = vpt_renderer(test_tensor_cuda)
+                    transmittance_volume_tensor = vpt_renderer.module().get_transmittance_volume(test_tensor_cuda)
+                    #transmittance_array = transmittance_volume_tensor.cpu().numpy()
+                    #save_nc('/home/christoph/datasets/Test/vis.nc', transmittance_array)
+                    if not use_energy_approach:
+                        gains.append((((vis + transmittance_volume_tensor).clamp(0, 1) - vis) * occupation_volume_narrow).sum().cpu())
+                    else:
+                        obs_freq_field_cpy = obs_freq_field.clone().detach()
+                        angular_obs_freq_field_cpy = angular_obs_freq_field.clone().detach()
+                        vpt_renderer.module().update_observation_frequency_fields(
+                            num_bins_x, num_bins_y, transmittance_volume_tensor, obs_freq_field_cpy, angular_obs_freq_field_cpy)
+                        vpt_renderer.module().compute_energy(
+                            i + 1, num_bins_x, num_bins_y, gamma,
+                            obs_freq_field_cpy, angular_obs_freq_field_cpy, occupation_volume_narrow, energy_term_field)
+                        gains.append(energy_term_field.sum().cpu())
+                    tested_matrices.append((view_matrix_array, vm, ivm))
+                # Get the best view
+                gains = torch.tensor(np.array(gains), device=cpu_device)
+                idx = gains.argmax().item()
+                view_matrix_array, vm, ivm = tested_matrices[idx]
+            elif not use_bos:
                 tested_matrices = []
                 for view_idx in range(num_sampled_test_views):
                     is_valid = False
@@ -839,8 +880,6 @@ if __name__ == '__main__':
     #is_spherical = radii_sorted[2] - radii_sorted[0] < 0.01
     is_spherical = radii_sorted[2] / radii_sorted[0] < 1.5
 
-    start = time.time()
-
     ds = 3
     vpt_renderer.module().set_secondary_volume_downscaling_factor(ds)
     volume_voxel_size = vpt_renderer.module().get_volume_voxel_size()
@@ -872,9 +911,10 @@ if __name__ == '__main__':
         plt.tight_layout()
         plt.show()
     else:
-        n_avg = 4
-        views = [4, 8, 16, 32, 64]
-        #views = [4, 8]
+        n_avg = 8
+        #n_avg = 1
+        views = [4, 8, 16, 32, 64, 128]
+        #views = [4, 128]
         views_np = np.array(views, dtype=int)
         time_rnd = np.zeros(len(views))
         time_bos = np.zeros(len(views))
@@ -914,9 +954,11 @@ if __name__ == '__main__':
         plt.xlabel('#Candidate views')
         plt.ylabel('Time (s)')
         plt.xscale('log')
+        plt.yscale('log')
         plt.gca().xaxis.set_major_formatter(ticker.FuncFormatter(lambda y, _: f'{int(y)}'))
         plt.minorticks_off()
         plt.xticks(views_np)
+        plt.yticks([1, 10, 100])
         plt.legend(loc="lower right")
         plt.tight_layout()
         plt.savefig('time.pdf', bbox_inches='tight', pad_inches=0.01)
