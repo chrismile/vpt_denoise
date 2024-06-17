@@ -1,6 +1,7 @@
 import sys
 import subprocess
 from pathlib import Path
+from packaging.version import Version
 from setuptools import setup
 from setuptools.command.egg_info import egg_info
 from torch.utils.cpp_extension import BuildExtension, CppExtension, IS_WINDOWS, IS_MACOS
@@ -31,8 +32,11 @@ if not IS_WINDOWS:
         if len(tbb_flags) > 0:
             extra_compile_args += tbb_flags.split()
             extra_compile_args.append('-DUSE_TBB')
+            tbb_version = run_program('pkg-config --modversion tbb')
+            if Version(tbb_version) >= Version('2021.0'):
+                extra_compile_args.append('-DUSE_TBB_ONEAPI')
             print('Enabling TBB parallelization support.')
-        if len(run_program('pkg-config --cflags tbb')) > 0 and Path('/usr/include/tbb').is_dir():
+        if len(run_program('pkg-config --cflags tbb')) == 0 and Path('/usr/include/tbb').is_dir():
             extra_compile_args.append('-I/usr/include/tbb')
 
 

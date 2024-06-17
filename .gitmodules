@@ -1,6 +1,6 @@
 [submodule "pylimbo/third_party/limbo"]
 	path = pylimbo/third_party/limbo
-	url = https://github.com/chrismile/limbo.git
+	url = https://github.com/resibots/limbo.git
 [submodule "pylimbo/third_party/eigen"]
 	path = pylimbo/third_party/eigen
 	url = https://gitlab.com/libeigen/eigen.git
