@@ -21,6 +21,7 @@ elif IS_MACOS:
 else:
     extra_compile_args.append('-std=c++17')
     extra_compile_args.append('-fopenmp')
+    extra_compile_args.append('-O3')
 
 # USE_NLOPT already defined before including Limbo.
 # extra_compile_args.append('-DUSE_NLOPT')
