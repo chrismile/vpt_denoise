@@ -128,7 +128,7 @@ def sample_view_matrix_circle(aabb):
     phi = np.arccos(1.0 - 2.0 * random.random())
     r_total = 0.5 * vec_length(np.array([aabb[1] - aabb[0], aabb[3] - aabb[2], aabb[5] - aabb[4]]))
     #r = random.uniform(r_total / 16.0, r_total / 2.0)
-    if test_case == 'Cloud':
+    if test_case == 'Cloud' or test_case == 'Cloud Fog':
         r = r_total * 1.8
     else:
         r = random.uniform(r_total * 1.25, r_total * 1.75)
@@ -481,9 +481,10 @@ if __name__ == '__main__':
 
     #test_case = 'Wholebody'
     #test_case = 'Angiography'
-    #test_case = 'HeadDVR'
+    test_case = 'HeadDVR'
     #test_case = 'HollowSphere'
-    test_case = 'Cloud'
+    #test_case = 'Cloud'
+    #test_case = 'Cloud Fog'
 
     use_python_bos_optimizer = False
 
@@ -504,7 +505,7 @@ if __name__ == '__main__':
     elif test_case == 'HollowSphere':
         vpt_renderer.module().load_volume_file(
             str(pathlib.Path.home()) + '/datasets/Toy/vpt/hollowsphere.dat')
-    elif test_case == 'Cloud':
+    elif test_case == 'Cloud' or test_case == 'Cloud Fog':
         vpt_renderer.module().load_volume_file(
             str(pathlib.Path.home()) + '/Programming/C++/CloudRendering/Data/CloudDataSets/wdas_cloud/wdas_cloud.vdb')
     vpt_renderer.module().load_environment_map(
@@ -536,7 +537,7 @@ if __name__ == '__main__':
     denoiser_name = 'None'
     if mode != 'Ray Marching (Emission/Absorption)':
         denoiser_name = 'OptiX Denoiser'
-    if denoiser_name != 'None' and test_case != 'Cloud':
+    if denoiser_name != 'None' and test_case != 'Cloud' and test_case != 'Cloud Fog':
         vpt_renderer.module().set_denoiser(denoiser_name)
 
     spp = 256
@@ -579,17 +580,21 @@ if __name__ == '__main__':
         vpt_renderer.module().set_iso_value(iso_value)
     elif test_case == 'HeadDVR':
         vpt_renderer.module().set_use_isosurfaces(False)
-        vpt_renderer.module().set_extinction_scale(10000.0)
+        vpt_renderer.module().set_extinction_scale(20.0)
     elif test_case == 'HollowSphere':
         vpt_renderer.module().set_use_isosurfaces(False)
     elif test_case == 'Cloud':
         vpt_renderer.module().set_use_transfer_function(False)
         vpt_renderer.module().set_use_isosurfaces(False)
-        vpt_renderer.module().set_extinction_scale(10000.0)
         vpt_renderer.module().set_scattering_albedo([0.99, 0.99, 0.99])
         vpt_renderer.module().set_extinction_scale(400.0)
         #spp = 2048
         #vpt_renderer.set_num_frames(spp)
+    elif test_case == 'Cloud Fog':
+        vpt_renderer.module().set_use_transfer_function(False)
+        vpt_renderer.module().set_use_isosurfaces(False)
+        vpt_renderer.module().set_scattering_albedo([0.99, 0.99, 0.99])
+        vpt_renderer.module().set_extinction_scale(8.0)
 
     vpt_renderer.module().set_iso_surface_color([0.4, 0.4, 0.4])
     vpt_renderer.module().set_surface_brdf('Lambertian')
@@ -615,8 +620,10 @@ if __name__ == '__main__':
     use_mixed_mode = True
     use_visibility_aware_sampling = True
     if test_case == 'HeadDVR':
+        shall_sample_completely_random_views = False
+        use_mixed_mode = False
         use_visibility_aware_sampling = False
-    elif test_case == 'Cloud':
+    elif test_case == 'Cloud' or test_case == 'Cloud Fog':
         shall_sample_completely_random_views = False
         use_mixed_mode = False
         use_visibility_aware_sampling = False
