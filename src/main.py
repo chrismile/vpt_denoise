@@ -481,10 +481,11 @@ if __name__ == '__main__':
 
     #test_case = 'Wholebody'
     #test_case = 'Angiography'
-    test_case = 'HeadDVR'
+    #test_case = 'HeadDVR'
     #test_case = 'HollowSphere'
     #test_case = 'Cloud'
     #test_case = 'Cloud Fog'
+    test_case = 'Brain'
 
     use_python_bos_optimizer = False
 
@@ -508,9 +509,12 @@ if __name__ == '__main__':
     elif test_case == 'Cloud' or test_case == 'Cloud Fog':
         vpt_renderer.module().load_volume_file(
             str(pathlib.Path.home()) + '/Programming/C++/CloudRendering/Data/CloudDataSets/wdas_cloud/wdas_cloud.vdb')
+    elif test_case == 'Brain':
+        vpt_renderer.module().load_volume_file(
+            str(pathlib.Path.home()) + '/datasets/Siemens/brain_cleaned/23.42um_4_cleaned.dat')
     vpt_renderer.module().load_environment_map(
         str(pathlib.Path.home())
-        + '/Programming/C++/CloudRendering/Data/CloudDataSets/env_maps/small_empty_room_1_4k_blurred.exr')
+        + '/Programming/C++/CloudRendering/Data/CloudDataSets/env_maps/small_empty_room_1_4k_blurred_large.exr')
     vpt_renderer.module().set_use_transfer_function(True)
 
     #mode = 'Delta Tracking'
@@ -533,6 +537,11 @@ if __name__ == '__main__':
     elif test_case == 'HollowSphere':
         vpt_renderer.module().load_transfer_function_file(
             str(pathlib.Path.home()) + '/Programming/C++/CloudRendering/Data/TransferFunctions/HollowSphere.xml')
+    elif test_case == 'Brain':
+        vpt_renderer.module().load_transfer_function_file(
+            str(pathlib.Path.home()) + '/Programming/C++/CloudRendering/Data/TransferFunctions/BrainDens.xml')
+        vpt_renderer.module().load_transfer_function_file_gradient(
+            str(pathlib.Path.home()) + '/Programming/C++/CloudRendering/Data/TransferFunctions/BrainGrad.xml')
 
     denoiser_name = 'None'
     if mode != 'Ray Marching (Emission/Absorption)':
@@ -595,6 +604,18 @@ if __name__ == '__main__':
         vpt_renderer.module().set_use_isosurfaces(False)
         vpt_renderer.module().set_scattering_albedo([0.99, 0.99, 0.99])
         vpt_renderer.module().set_extinction_scale(8.0)
+    if test_case == 'Brain':
+        vpt_renderer.module().set_use_isosurfaces(True)
+        vpt_renderer.module().set_use_isosurface_tf(True)
+        vpt_renderer.module().set_isosurface_type('Density')
+        iso_value = 0.05
+        vpt_renderer.module().set_iso_value(iso_value)
+        use_headlight = True
+        if use_headlight:
+            vpt_renderer.module().set_use_headlight(use_headlight)
+            vpt_renderer.module().set_use_builtin_environment_map('Black')
+            vpt_renderer.module().set_use_headlight_distance(False)
+            vpt_renderer.module().set_headlight_intensity(6.0)
 
     vpt_renderer.module().set_iso_surface_color([0.4, 0.4, 0.4])
     vpt_renderer.module().set_surface_brdf('Lambertian')
@@ -627,6 +648,10 @@ if __name__ == '__main__':
         shall_sample_completely_random_views = False
         use_mixed_mode = False
         use_visibility_aware_sampling = False
+    elif test_case == 'Brain':
+        shall_sample_completely_random_views = False
+        use_mixed_mode = False
+        use_visibility_aware_sampling = False
     ds = 2
     vpt_renderer.module().set_secondary_volume_downscaling_factor(ds)
     # use_bos = False  # Bayesian optimal sampling
@@ -655,7 +680,7 @@ if __name__ == '__main__':
     #save_nc('/home/christoph/datasets/Test/occupation.nc', occupation_volume_array)
     fovy = vpt_renderer.module().get_camera_fovy()
 
-    num_frames = 128
+    num_frames = 2
     for i in range(num_frames):
         if use_mixed_mode:
             use_visibility_aware_sampling = i >= num_frames // 2
