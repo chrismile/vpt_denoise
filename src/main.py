@@ -37,6 +37,7 @@ import torch
 #conda install -c conda-forge openexr-python
 import OpenEXR
 import Imath
+from PIL import Image
 import array
 from vpt import VolumetricPathTracingRenderer
 import time
@@ -88,6 +89,17 @@ def save_tensor_openexr(file_path, data, dtype=np.float16, use_alpha=False):
         out.writePixels({'R': reds, 'G': greens, 'B': blues})
 
 
+def save_tensor_png(file_path, data):
+    # Convert linear RGB to sRGB.
+    for i in range(3):
+        data[i, :, :] = np.power(data[i, :, :], 1.0 / 2.2)
+    data = np.clip(data, 0.0, 1.0)
+    data = data.transpose(1, 2, 0)
+    data = (data * 255).astype('uint8')
+    image_out = Image.fromarray(data)
+    image_out.save(file_path)
+
+
 def save_camera_config(file_path, view_matrix):
     with open(file_path, 'w') as f:
         for i in range(16):
@@ -129,9 +141,10 @@ def sample_view_matrix_circle(aabb):
     r_total = 0.5 * vec_length(np.array([aabb[1] - aabb[0], aabb[3] - aabb[2], aabb[5] - aabb[4]]))
     #r = random.uniform(r_total / 16.0, r_total / 2.0)
     if test_case == 'Cloud' or test_case == 'Cloud Fog':
-        r = r_total * 1.8
+        r = r_total * 1.7
     else:
-        r = random.uniform(r_total * 1.25, r_total * 1.75)
+        #r = random.uniform(r_total * 1.25, r_total * 1.75)
+        r = random.uniform(r_total * 1.35, r_total * 1.8)
     camera_position = np.array([r * np.sin(phi) * np.cos(theta), r * np.sin(phi) * np.sin(theta), r * np.cos(phi)])
     camera_forward = vec_normalize(camera_position)
     camera_right = vec_normalize(vec_cross(global_up, camera_forward))
@@ -160,8 +173,8 @@ def jitter_direction(camera_forward, jitter_rad):
     q_xyz = np.cross(v1, v2)
     q_w = np.inner(v1, v1) * np.inner(v2, v2) + np.dot(v1, v2)
     transform = Rotation.from_quat(np.array([q_xyz[0], q_xyz[1], q_xyz[2], q_w]))
-    phi = np.random.uniform(0.0, 2.0 * np.pi)
-    theta = np.random.uniform(0, jitter_rad)
+    phi = random.uniform(0.0, 2.0 * np.pi)
+    theta = random.uniform(0, jitter_rad)
     vec_spherical = np.array([np.sin(theta) * np.cos(phi), np.sin(theta) * np.sin(phi), np.cos(theta)])
     vec_new = transform.apply(vec_spherical)
     return vec_new
@@ -265,12 +278,12 @@ def get_position_random_range(aabb):
 
 def sample_random_view(aabb):
     # https://stackoverflow.com/questions/31600717/how-to-generate-a-random-quaternion-quickly
-    rvec = np.random.uniform(0.0, 1.0, 3)
+    rvec = [random.uniform(0.0, 1.0), random.uniform(0.0, 1.0), random.uniform(0.0, 1.0)]
     u = rvec[0]
     v = rvec[1]
     w = rvec[2]
     cam_pos_range = get_position_random_range(aabb)
-    camera_position = np.array([np.random.uniform(cam_pos_range[i][0], cam_pos_range[i][1]) for i in range(3)])
+    camera_position = np.array([random.uniform(cam_pos_range[i][0], cam_pos_range[i][1]) for i in range(3)])
     params = {
         'cx': camera_position[0], 'cy': camera_position[1], 'cz': camera_position[2],
         'u': u, 'v': v, 'w': w
@@ -444,7 +457,8 @@ def check_camera_is_valid(occupation_volume, aabb, view_matrix, inverse_view_mat
 
 
 if __name__ == '__main__':
-    #random.seed(17)
+    #random.seed(31)
+    #pylimbo.seed_random(37)
     cuda_device_idx = 0
     vulkan_device_idx = 0
     cpu_device = torch.device('cpu')
@@ -473,8 +487,11 @@ if __name__ == '__main__':
     vpt_renderer = VolumetricPathTracingRenderer()
     render_module = vpt_renderer.module()
 
+    gaussian_splatting_data = True
     out_dir = f'out_{datetime.datetime.now():%Y-%m-%d_%H:%M:%S}'
     pathlib.Path(out_dir).mkdir(exist_ok=True)
+    if gaussian_splatting_data:
+        pathlib.Path(f'{out_dir}/images').mkdir(exist_ok=True)
     #with open(f'{out_dir}/extrinsics.txt', 'w') as f:
     #    f.write(f'{vpt_renderer.module().get_camera_fovy()}')
     camera_infos = []
@@ -680,7 +697,7 @@ if __name__ == '__main__':
     #save_nc('/home/christoph/datasets/Test/occupation.nc', occupation_volume_array)
     fovy = vpt_renderer.module().get_camera_fovy()
 
-    num_frames = 2
+    num_frames = 128
     for i in range(num_frames):
         if use_mixed_mode:
             use_visibility_aware_sampling = i >= num_frames // 2
@@ -810,20 +827,31 @@ if __name__ == '__main__':
         #image_cloud_only = vpt_renderer.module().get_feature_map_from_string(test_tensor_cuda, 'Cloud Only')
         #save_tensor_openexr(f'{out_dir}/{fg_name}', image_cloud_only.cpu().numpy(), use_alpha=True)
 
-        fg_name = f'fg_{i}.exr'
         vpt_test_tensor_cuda = vpt_renderer(test_tensor_cuda)
-        save_tensor_openexr(f'{out_dir}/{fg_name}', vpt_test_tensor_cuda.cpu().numpy(), use_alpha=True)
+        if gaussian_splatting_data:
+            fg_name = f'fg_{i}.png'
+            save_tensor_png(f'{out_dir}/images/{fg_name}', vpt_test_tensor_cuda.cpu().numpy())
+        else:
+            fg_name = f'fg_{i}.exr'
+            save_tensor_openexr(f'{out_dir}/{fg_name}', vpt_test_tensor_cuda.cpu().numpy(), use_alpha=True)
 
-        bg_name = f'bg_{i}.exr'
         image_background = vpt_renderer.module().get_feature_map_from_string(test_tensor_cuda, 'Background')
-        save_tensor_openexr(f'{out_dir}/{bg_name}', image_background.cpu().numpy())
+        if gaussian_splatting_data:
+            bg_name = f'bg_{i}.png'
+            save_tensor_png(f'{out_dir}/images/{bg_name}', image_background.cpu().numpy())
+        else:
+            bg_name = f'bg_{i}.exr'
+            save_tensor_openexr(f'{out_dir}/{bg_name}', image_background.cpu().numpy())
         #save_camera_config(f'{out_dir}/intrinsics_{i}.txt', vpt_renderer.module().get_camera_view_matrix())
 
         depth_name = f'depth_{i}.exr'
         image_depth = vpt_renderer.module().get_feature_map_from_string(test_tensor_cuda, 'Depth Blended')
         #mask = image_depth[1, :, :] > 1e-5
         #image_depth[0, mask] /= image_depth[1, mask]
-        save_tensor_openexr(f'{out_dir}/{depth_name}', image_depth.cpu().numpy())
+        if gaussian_splatting_data:
+            save_tensor_openexr(f'{out_dir}/images/{depth_name}', image_depth.cpu().numpy())
+        else:
+            save_tensor_openexr(f'{out_dir}/{depth_name}', image_depth.cpu().numpy())
 
         #vm = vpt_renderer.module().get_camera_view_matrix()
         camera_info = dict()
