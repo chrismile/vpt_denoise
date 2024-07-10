@@ -25,6 +25,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import os
+import sys
 import random
 import datetime
 import queue
@@ -41,6 +42,7 @@ from PIL import Image
 import array
 from vpt import VolumetricPathTracingRenderer
 import time
+import argparse
 #from netCDF4 import Dataset
 
 # Bayesian optimization
@@ -457,10 +459,32 @@ def check_camera_is_valid(occupation_volume, aabb, view_matrix, inverse_view_mat
 
 
 if __name__ == '__main__':
-    #random.seed(31)
-    #pylimbo.seed_random(37)
-    cuda_device_idx = 0
-    vulkan_device_idx = 0
+    parser = argparse.ArgumentParser(
+        prog='vpt_denoise',
+        description='Generates volumetric path tracing images.')
+    parser.add_argument('-t', '--test_case', default='Brain')
+    parser.add_argument('-r', '--img_res', type=int, default=1024)
+    parser.add_argument('-n', '--num_frames', type=int, default=128)
+    parser.add_argument('-o', '--out_dir')
+    parser.add_argument('--use_const_seed', action='store_true', default=False)
+    parser.add_argument('--use_headlight', action='store_true', default=False)
+    parser.add_argument('--device_idx', type=int, default=0)
+    args = parser.parse_args()
+
+    test_case = args.test_case
+    #test_case = 'Wholebody'
+    #test_case = 'Angiography'
+    #test_case = 'HeadDVR'
+    #test_case = 'HollowSphere'
+    #test_case = 'Cloud'
+    #test_case = 'Cloud Fog'
+    #test_case = 'Brain'
+
+    if args.use_const_seed:
+        random.seed(31)
+        pylimbo.seed_random(37)
+    cuda_device_idx = args.device_idx
+    vulkan_device_idx = args.device_idx
     cpu_device = torch.device('cpu')
     cuda_device = torch.device(f'cuda:{cuda_device_idx}' if torch.cuda.is_available() else 'cpu')
     vulkan_device = torch.device(f'vulkan:{vulkan_device_idx}' if torch.is_vulkan_available() else 'cpu')
@@ -473,8 +497,8 @@ if __name__ == '__main__':
     #print(vulkan_device)
 
     test_mode = False
-    image_width = 1024
-    image_height = 1024
+    image_width = args.img_res
+    image_height = args.img_res
     aspect = image_width / image_height
 
     test_tensor_cpu = torch.ones((4, image_height, image_width), dtype=torch.float32, device=cpu_device)
@@ -488,21 +512,18 @@ if __name__ == '__main__':
     render_module = vpt_renderer.module()
 
     gaussian_splatting_data = True
-    out_dir = f'out_{datetime.datetime.now():%Y-%m-%d_%H:%M:%S}'
-    pathlib.Path(out_dir).mkdir(exist_ok=True)
+    if args.out_dir is None:
+        out_dir = f'out_{datetime.datetime.now():%Y-%m-%d_%H:%M:%S}'
+    else:
+        out_dir = args.out_dir
+        if out_dir[-1] == '/' or out_dir[-1] == '\\':
+            out_dir = out_dir[:-1]
+    pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
     if gaussian_splatting_data:
         pathlib.Path(f'{out_dir}/images').mkdir(exist_ok=True)
     #with open(f'{out_dir}/extrinsics.txt', 'w') as f:
     #    f.write(f'{vpt_renderer.module().get_camera_fovy()}')
     camera_infos = []
-
-    #test_case = 'Wholebody'
-    #test_case = 'Angiography'
-    #test_case = 'HeadDVR'
-    #test_case = 'HollowSphere'
-    #test_case = 'Cloud'
-    #test_case = 'Cloud Fog'
-    test_case = 'Brain'
 
     use_python_bos_optimizer = False
 
@@ -627,9 +648,8 @@ if __name__ == '__main__':
         vpt_renderer.module().set_isosurface_type('Density')
         iso_value = 0.05
         vpt_renderer.module().set_iso_value(iso_value)
-        use_headlight = True
-        if use_headlight:
-            vpt_renderer.module().set_use_headlight(use_headlight)
+        if args.use_headlight:
+            vpt_renderer.module().set_use_headlight(True)
             vpt_renderer.module().set_use_builtin_environment_map('Black')
             vpt_renderer.module().set_use_headlight_distance(False)
             vpt_renderer.module().set_headlight_intensity(6.0)
@@ -697,7 +717,7 @@ if __name__ == '__main__':
     #save_nc('/home/christoph/datasets/Test/occupation.nc', occupation_volume_array)
     fovy = vpt_renderer.module().get_camera_fovy()
 
-    num_frames = 128
+    num_frames = args.num_frames
     for i in range(num_frames):
         if use_mixed_mode:
             use_visibility_aware_sampling = i >= num_frames // 2
