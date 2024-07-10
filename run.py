@@ -108,6 +108,7 @@ if __name__ == '__main__':
             recipient_email_address = lines[5]
 
     for command in commands:
+        print(f"Running '{' '.join(command)}'...")
         proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         (output, err) = proc.communicate()
         proc_status = proc.wait()
