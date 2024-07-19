@@ -85,11 +85,15 @@ def escape_html(s):
 commands = [
     [
         'python3', 'src/main.py', '--img_res', '2048', '--num_frames', '128',
-        '-o', '/home/neuhauser/datasets/VPT/brain/preset1', '--use_headlight'
+        '-o', os.path.join(pathlib.Path.home(), 'datasets/VPT/brain/preset1')
     ],
     [
         'python3', 'src/main.py', '--img_res', '2048', '--num_frames', '128',
-        '-o', '/home/neuhauser/datasets/VPT/brain/preset2'
+        '-o', os.path.join(pathlib.Path.home(), 'datasets/VPT/brain/preset2')
+    ],
+    # The following code is for training 3DGS models; it is currently not yet publicly released.
+    [
+        'python3', os.path.join(pathlib.Path.home(), 'Programming/DL/gaussian_me/run.py')
     ]
 ]
 
@@ -154,4 +158,13 @@ if __name__ == '__main__':
             sys.exit(1)
             #raise Exception(f'Process returned error code {proc_status}.')
 
+    message_text_raw = 'run.py finished successfully'
+    message_text_html = \
+        '<html>\n<head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"></head>\n<body>\n'
+    message_text_html += 'run.py finished successfully'
+    message_text_html += '</body>\n</html>'
+    send_mail(
+        sender_name, sender_email_address, user_name, password,
+        recipient_name, recipient_email_address,
+        'run.py finished successfully', message_text_raw, message_text_html)
     print('Finished.')
