@@ -1,6 +1,6 @@
 # vpt_denoise
 
-Code highlighting how to use the application [CloudRenderer](https://github.com/chrismile/CloudRendering) to generate
+Code highlighting how to use the application [CloudRendering](https://github.com/chrismile/CloudRendering) to generate
 volumetric path tracing images in Python. This can be used for implementing deep learning image denoisers, e.g.,
 using the Python interface of PyTorch.
 
