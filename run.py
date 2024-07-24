@@ -26,6 +26,7 @@
 
 import os
 import sys
+import itertools
 import pathlib
 import subprocess
 import html
@@ -83,19 +84,41 @@ def escape_html(s):
 
 
 commands = [
-    [
-        'python3', 'src/main.py', '--img_res', '2048', '--num_frames', '128',
-        '-o', os.path.join(pathlib.Path.home(), 'datasets/VPT/brain/preset1')
-    ],
-    [
-        'python3', 'src/main.py', '--img_res', '2048', '--num_frames', '128',
-        '-o', os.path.join(pathlib.Path.home(), 'datasets/VPT/brain/preset2')
-    ],
-    # The following code is for training 3DGS models; it is currently not yet publicly released.
-    [
-        'python3', os.path.join(pathlib.Path.home(), 'Programming/DL/gaussian_me/run.py')
-    ]
+    #[
+    #    'python3', 'src/main.py', '--img_res', '2048', '--num_frames', '128',
+    #    '-o', os.path.join(pathlib.Path.home(), 'datasets/VPT/brain/preset1')
+    #],
+    #[
+    #    'python3', 'src/main.py', '--img_res', '2048', '--num_frames', '128',
+    #    '-o', os.path.join(pathlib.Path.home(), 'datasets/VPT/brain/preset2')
+    #],
+    #[
+    #    'python3', os.path.join(pathlib.Path.home(), 'Programming/DL/gaussian_me/run.py')
+    #]
 ]
+
+
+# The following code is for training 3DGS models; the script train.py is currently not yet publicly released.
+train_script = os.path.join(pathlib.Path.home(), 'Programming/DL/gaussian_me/train.py')
+train_3dgs = os.path.exists(train_script)
+if train_3dgs:
+    scenes = ["brain"]
+    presets = [1, 2]
+    settings = list(itertools.product(scenes, presets))
+    for (scene, preset) in settings:
+        scene_path = os.path.join(pathlib.Path.home(), "datasets/VPT", scene, f"preset{preset}")
+        model_path = os.path.join(pathlib.Path.home(), "datasets/3dgs", f"{scene}_preset{preset}_1")
+        commands.append([
+            'python3', train_script,
+            '-s', scene_path,
+            '-m', model_path,
+            '--eval',
+            '--test_iterations', '7000', '15000', '30000',
+            '--images', 'images',
+            '--densify_grad_threshold', '0.0001',
+            '--save_iterations', '7000', '15000', '30000'
+        ])
+
 
 
 if __name__ == '__main__':
