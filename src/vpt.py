@@ -64,3 +64,15 @@ class VolumetricPathTracingRenderer(object):
 
     def module(self):
         return torch.ops.vpt
+
+    def triangulate_isosurfaces(self):
+        triangle_indices, vertex_positions, vertex_colors, vertex_normals = self.module().triangulate_isosurfaces()
+        return {
+            'triangle_indices': triangle_indices.cpu().numpy(),
+            'vertex_positions': vertex_positions.cpu().numpy(),
+            'vertex_colors': vertex_colors.cpu().numpy(),
+            'vertex_normals': vertex_positions.cpu().numpy()
+        }
+
+    def export_vdb_volume(self, filepath):
+        return self.module().export_vdb_volume(filepath)
