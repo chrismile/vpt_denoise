@@ -177,6 +177,23 @@ def setup_surface():
     bpy.ops.object.shade_smooth()
     print('Mesh creation finished.')
 
+    print('Setting mesh material...')
+    mat = bpy.data.materials.new(name="IsosurfaceMaterial")
+    obj.data.materials.append(mat)
+    mat.use_nodes = True
+    node_tree = mat.node_tree
+    nodes = node_tree.nodes
+    bsdf = nodes.get("Principled BSDF")
+    vertex_color_node = nodes.new(type="ShaderNodeVertexColor")
+    vertex_color_node.layer_name = "Col"
+    node_tree.links.new(vertex_color_node.outputs[0], bsdf.inputs[0])  # Link to "Base Color".
+
+    # Map index -> name can change between Blender versions, but is language dependent. We will assume English.
+    # For a list see: https://blender.stackexchange.com/questions/160042/principled-bsdf-via-python-api
+    bsdf.inputs['Metallic'].default_value = 0.2
+    bsdf.inputs['Subsurface Weight'].default_value = 0.5
+    bsdf.inputs['Subsurface Radius'].default_value[0] = 0.2
+
 
 def setup_volume():
     bpy.ops.object.volume_add(align='WORLD', location=(0, 0, 0), rotation=(0.0, 0.0, 0.0), scale=(1.0, 1.0, 1.0))
@@ -188,6 +205,35 @@ def setup_volume():
     #volume.scale[0] = 0.005
     #volume.scale[1] = 0.005
     #volume.scale[2] = 0.005
+
+    print('Setting volume material...')
+    mat = bpy.data.materials.new(name="VolumeMaterial")
+    volume.data.materials.append(mat)
+    mat.use_nodes = True
+    node_tree = mat.node_tree
+    nodes = node_tree.nodes
+    principled_volume = nodes.get("Principled Volume")
+    # TODO: Implement transfer function by setting input 'Color' dependent
+
+    # Map index -> name can change between Blender versions, but is language dependent. We will assume English.
+    # (0, "Color")
+    # (1, "Color Attribute")
+    # (2, "Density")
+    # (3, "Density Attribute")
+    # (4, "Anisotropy")
+    # (5, "Absorption Color")
+    # (6, "Emission Strength")
+    # (7, "Emission Color")
+    # (8, "Blackbody Intensity")
+    # (9, "Blackbody Tint")
+    # (10, "Temperature")
+    # (11, "Temperature Attribute")
+    # (12, "Weight")
+    #for i, o in enumerate(principled_volume.inputs):
+    #    print(i, o.name)
+    principled_volume.inputs[0].default_value = (0.499793, 0.104998, 0.124452, 1)
+    principled_volume.inputs['Density'].default_value = 1000.0
+    principled_volume.inputs['Anisotropy'].default_value = 0.5
 
 
 def setup_cam_poses(camera, pointlight):
