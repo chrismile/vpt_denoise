@@ -254,11 +254,11 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         prog='vpt_denoise',
         description='Generates volumetric path tracing images.')
-    parser.add_argument('-t', '--test_case', default='Brain')
+    parser.add_argument('-t', '--test_case', default='Wholebody')
     parser.add_argument('-r', '--img_res', type=int, default=1024)
-    parser.add_argument('-n', '--num_frames', type=int, default=128)
+    parser.add_argument('-n', '--num_frames', type=int, default=2)
     parser.add_argument('-o', '--out_dir')
-    parser.add_argument('--use_const_seed', action='store_true', default=False)
+    parser.add_argument('--use_const_seed', action='store_true', default=True)
     parser.add_argument('--use_headlight', action='store_true', default=False)
     parser.add_argument('--device_idx', type=int, default=0)
     args = parser.parse_args()
@@ -320,6 +320,8 @@ if __name__ == '__main__':
     use_python_bos_optimizer = False
 
     data_dir = '/mnt/data/Flow/Scalar/'
+    if not os.path.isdir(data_dir):
+        data_dir = '/home/christoph/datasets/Scalar/'
     if not os.path.isdir(data_dir):
         data_dir = '/media/christoph/Elements/Datasets/Scalar/'
     if not os.path.isdir(data_dir):
@@ -477,7 +479,7 @@ if __name__ == '__main__':
         shall_sample_completely_random_views = False
         use_mixed_mode = False
         use_visibility_aware_sampling = False
-    elif test_case == 'Brain':
+    elif test_case == 'Wholebody' or test_case == 'Brain':
         shall_sample_completely_random_views = False
         use_mixed_mode = False
         use_visibility_aware_sampling = False

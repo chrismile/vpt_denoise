@@ -106,6 +106,8 @@ def setup_camera():
     bpy.context.scene.camera = camera_obj
     camera_obj.data.lens_unit = 'FOV'  # Access it by its object name
     camera_obj.data.angle = fovy  # math.radians(10)
+    bpy.context.object.data.clip_start = 1.0 / 256.0
+    bpy.context.object.data.clip_end = 50.0
     return camera_obj
 
 
@@ -135,6 +137,7 @@ def setup_light(use_headlight):
 
 
 def setup_surface():
+    print('Starting to convert mesh data...')
     triangle_indices = iso_data['triangle_indices'].astype(np.int32)
     vertex_positions = iso_data['vertex_positions']
     vertex_colors = iso_data['vertex_colors']
@@ -146,33 +149,33 @@ def setup_surface():
     loop_total = np.repeat(3, num_triangles).astype(np.int32)
     loop_colors = np.take(vertex_colors, triangle_indices, axis=0)  # [vertex_colors[i] for i in triangle_indices]
 
-    # TODO: Vertex normals
-
     # For more details see: https://stackoverflow.com/questions/68297161/creating-a-blender-mesh-directly-from-numpy-data
+    print('Setting Blender vertices...')
     mesh = bpy.data.meshes.new(name='Isosurface Mesh')
     mesh.vertices.add(num_vertices)
     mesh.vertices.foreach_set("co", vertex_positions.flatten())
+    mesh.vertices.foreach_set("normal", vertex_normals.flatten())
     num_vertex_indices = triangle_indices.shape[0]
+    print('Setting Blender loops...')
     mesh.loops.add(num_vertex_indices)
     mesh.loops.foreach_set("vertex_index", triangle_indices)
     mesh.polygons.add(num_triangles)
     mesh.polygons.foreach_set("loop_start", loop_start)
     mesh.polygons.foreach_set("loop_total", loop_total)
-    bpy_inspect(mesh)
+    print('Setting Blender vertex colors...')
     bpy_vertex_colors = mesh.vertex_colors.new()
-    for i, col in enumerate(bpy_vertex_colors.data):
-        col.color[0] = loop_colors[i][0]
-        col.color[1] = loop_colors[i][1]
-        col.color[2] = loop_colors[i][2]
-        col.color[3] = loop_colors[i][3]
+    # TODO: https://blender.stackexchange.com/questions/280716/python-code-to-set-color-attributes-per-vertex-in-blender-3-5
+    bpy_vertex_colors.data.foreach_set("color", loop_colors.flatten())
+    print('Updating and validating Blender mesh...')
     mesh.update()
     mesh.validate()
     obj = bpy.data.objects.new('Isosurface Object', mesh)
     bpy.context.scene.collection.objects.link(obj)
-    obj.scale[0] = 0.25
-    obj.scale[1] = 0.25
-    obj.scale[2] = 0.25
+    obj.scale[0] = 1.0
+    obj.scale[1] = 1.0
+    obj.scale[2] = 1.0
     bpy.ops.object.shade_smooth()
+    print('Mesh creation finished.')
 
 
 def setup_volume():
@@ -182,9 +185,9 @@ def setup_volume():
     volume.data.filepath = os.path.abspath(vdb_path)
     volume.name = "Volume Data"
     # TODO
-    volume.scale[0] = 0.005
-    volume.scale[1] = 0.005
-    volume.scale[2] = 0.005
+    #volume.scale[0] = 0.005
+    #volume.scale[1] = 0.005
+    #volume.scale[2] = 0.005
 
 
 def setup_cam_poses(camera, pointlight):
@@ -219,7 +222,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         prog='vpt_denoise',
         description='Generates volumetric path tracing images.')
-    parser.add_argument('-t', '--test_case', default='Brain')
+    parser.add_argument('-t', '--test_case', default='Wholebody')
     parser.add_argument('-r', '--img_res', type=int, default=1024)
     parser.add_argument('-n', '--num_frames', type=int, default=2)
     parser.add_argument('-s', '--num_samples', type=int, default=4)
@@ -256,6 +259,8 @@ if __name__ == '__main__':
 
     data_dir = '/mnt/data/Flow/Scalar/'
     if not os.path.isdir(data_dir):
+        data_dir = '/home/christoph/datasets/Scalar/'
+    if not os.path.isdir(data_dir):
         data_dir = '/media/christoph/Elements/Datasets/Scalar/'
     if not os.path.isdir(data_dir):
         data_dir = '/home/christoph/datasets/Flow/Scalar/'
@@ -278,7 +283,7 @@ if __name__ == '__main__':
         #vpt_renderer.module().load_volume_file(
         #    str(pathlib.Path.home()) + '/datasets/Siemens/brain_cleaned/23.42um_4_cleaned.dat')
         vpt_renderer.module().load_volume_file(
-            str(pathlib.Path.home()) + '/datasets/Siemens/brain_cleaned/23.42um_4_cleaned_ds.dat')
+            str(pathlib.Path.home()) + '/datasets/Siemens/brain_cleaned/23.42um_4_cleaned_ds4.dat')
     vpt_renderer.module().load_environment_map(
         str(pathlib.Path.home())
         + '/Programming/C++/CloudRendering/Data/CloudDataSets/env_maps/small_empty_room_1_4k_blurred_large.exr')
@@ -336,6 +341,7 @@ if __name__ == '__main__':
     radii_sorted = sorted([rx, ry, rz])
     is_spherical = radii_sorted[2] / radii_sorted[0] < 1.9
 
+    print('Sampling camera poses...')
     camera_infos = []
     for frame_idx in range(num_frames):
         if shall_sample_completely_random_views:
@@ -365,8 +371,10 @@ if __name__ == '__main__':
         json.dump(camera_infos, f, ensure_ascii=False, indent=4)
 
     if use_isosurface:
+        print('Creating isosurface data...')
         iso_data = vpt_renderer.triangulate_isosurfaces()
     if use_volume:
+        print('Creating volume VDB data...')
         vdb_path = os.path.join(out_dir, 'volume.vdb')
         vpt_renderer.export_vdb_volume(vdb_path)
 
