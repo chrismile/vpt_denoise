@@ -40,8 +40,8 @@ from vpt import VolumetricPathTracingRenderer
 import time
 import argparse
 #from netCDF4 import Dataset
-from .util.sample_view import *
-from .util.save_tensor import *
+from util.sample_view import *
+from util.save_tensor import *
 
 # Bayesian optimization
 # conda install -c conda-forge bayesian-optimization
