@@ -103,30 +103,53 @@ commands = [
     #],
 
     # Cloud data
-    [
-        'python3', 'src/main.py',
-        #'python3', 'src/render_blender.py',
-        '--use_black_bg', '--scale_pos', '0.5',
-        #'--num_frames', '4',
-        '--file', '/home/neuhauser/datasets/Han/cloud_simulation_cameras/incomming_0057/incomming_0057.vdb',
-        '--camposes', '/home/neuhauser/datasets/Han/cloud_simulation_cameras/incomming_0057/images.json',
-        '--img_res', '1024', '--num_samples', '256', '--denoiser', 'Default',
-        '--scattering_albedo', '0.99', '--extinction_scale', '400.0',
-        '-o', os.path.join(pathlib.Path.home(), 'datasets/VPT/multiclouds/spp_256_optix/incomming_0057')
-    ],
-    [
+    #[
+    #    'python3', 'src/main.py',
+    #    #'python3', 'src/render_blender.py',
+    #    '--use_black_bg', '--scale_pos', '0.5',
+    #    #'--num_frames', '4',
+    #    '--file', '/home/neuhauser/datasets/Han/cloud_simulation_cameras/incomming_0057/incomming_0057.vdb',
+    #    '--camposes', '/home/neuhauser/datasets/Han/cloud_simulation_cameras/incomming_0057/images.json',
+    #    '--img_res', '1024', '--num_samples', '256', '--denoiser', 'Default',
+    #    '--scattering_albedo', '0.99', '--extinction_scale', '400.0',
+    #    '-o', os.path.join(pathlib.Path.home(), 'datasets/VPT/multiclouds/spp_256_optix/incomming_0057')
+    #],
+    #[
+    #    'python3', 'src/main.py',
+    #    # 'python3', 'src/render_blender.py',
+    #    '--use_black_bg', '--scale_pos', '0.5',
+    #    #'--num_frames', '4',
+    #    '--file', '/home/neuhauser/datasets/Han/cloud_simulation_cameras/incomming_0057/incomming_0057.vdb',
+    #    '--camposes', '/home/neuhauser/datasets/Han/cloud_simulation_cameras/incomming_0057/images.json',
+    #    '--img_res', '1024', '--num_samples', '256', '--denoiser', 'None',
+    #    '--scattering_albedo', '0.99', '--extinction_scale', '400.0',
+    #    '-o', os.path.join(pathlib.Path.home(), 'datasets/VPT/multiclouds/spp_256_noisy/incomming_0057')
+    #],
+]
+
+for samples in [512, 1024]:
+    commands.append([
         'python3', 'src/main.py',
         # 'python3', 'src/render_blender.py',
         '--use_black_bg', '--scale_pos', '0.5',
-        #'--num_frames', '4',
+        # '--num_frames', '4',
         '--file', '/home/neuhauser/datasets/Han/cloud_simulation_cameras/incomming_0057/incomming_0057.vdb',
         '--camposes', '/home/neuhauser/datasets/Han/cloud_simulation_cameras/incomming_0057/images.json',
-        '--img_res', '1024', '--num_samples', '256', '--denoiser', 'None',
+        '--img_res', '1024', '--num_samples', f'{samples}', '--denoiser', 'Default',
         '--scattering_albedo', '0.99', '--extinction_scale', '400.0',
-        '-o', os.path.join(pathlib.Path.home(), 'datasets/VPT/multiclouds/spp_256_noisy/incomming_0057')
-    ],
-]
-
+        '-o', os.path.join(pathlib.Path.home(), f'datasets/VPT/multiclouds/spp_{samples}_optix/incomming_0057')
+    ])
+    commands.append([
+        'python3', 'src/main.py',
+        # 'python3', 'src/render_blender.py',
+        '--use_black_bg', '--scale_pos', '0.5',
+        # '--num_frames', '4',
+        '--file', '/home/neuhauser/datasets/Han/cloud_simulation_cameras/incomming_0057/incomming_0057.vdb',
+        '--camposes', '/home/neuhauser/datasets/Han/cloud_simulation_cameras/incomming_0057/images.json',
+        '--img_res', '1024', '--num_samples', f'{samples}', '--denoiser', 'None',
+        '--scattering_albedo', '0.99', '--extinction_scale', '400.0',
+        '-o', os.path.join(pathlib.Path.home(), f'datasets/VPT/multiclouds/spp_{samples}_noisy/incomming_0057')
+    ])
 
 # The following code is for training 3DGS models; the script train.py is currently not yet publicly released.
 shall_train_3dgs = False
