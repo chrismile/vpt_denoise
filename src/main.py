@@ -257,6 +257,7 @@ if __name__ == '__main__':
     parser.add_argument('-t', '--test_case', default='Wholebody')
     parser.add_argument('-r', '--img_res', type=int, default=1024)
     parser.add_argument('-n', '--num_frames', type=int, default=2)
+    parser.add_argument('-c', '--camposes')
     parser.add_argument('-o', '--out_dir')
     parser.add_argument('--use_const_seed', action='store_true', default=True)
     parser.add_argument('--use_headlight', action='store_true', default=False)
@@ -511,13 +512,17 @@ if __name__ == '__main__':
     #save_nc('/home/christoph/datasets/Test/occupation.nc', occupation_volume_array)
     fovy = vpt_renderer.module().get_camera_fovy()
 
+    if args.camposes is not None:
+        with open(args.camposes, 'r') as f:
+            camera_infos = json.load(f)
+
     num_frames = args.num_frames
     for i in range(num_frames):
         if use_mixed_mode:
             use_visibility_aware_sampling = i >= num_frames // 2
             shall_sample_completely_random_views = use_visibility_aware_sampling
 
-        if use_visibility_aware_sampling:
+        if args.camposes is None and use_visibility_aware_sampling:
             vpt_renderer.set_num_frames(1)
             vpt_renderer.module().set_use_feature_maps(['Transmittance Volume'])
 
@@ -613,7 +618,7 @@ if __name__ == '__main__':
             vis = (vis + transmittance_volume_tensor).clamp(0, 1)
             vpt_renderer.set_num_frames(spp)
             vpt_renderer.module().set_use_feature_maps(used_feature_maps)
-        else:
+        elif args.camposes is None:
             if shall_sample_completely_random_views:
                 view_matrix_array, vm, ivm, _ = sample_random_view(aabb)
             elif is_spherical:
@@ -631,6 +636,27 @@ if __name__ == '__main__':
                 vpt_renderer.set_num_frames(spp)
                 vpt_renderer.module().set_use_feature_maps(used_feature_maps)
 
+        if args.camposes is None:
+            camera_info = dict()
+        else:
+            camera_info = camera_infos[i]
+            #camera_info['position'] = [ivm[i, 3] for i in range(0, 3)]
+            #camera_info['rotation'] = [
+            #    [ivm[i, 0] for i in range(0, 3)], [ivm[i, 1] for i in range(0, 3)], [ivm[i, 2] for i in range(0, 3)]
+            #]
+            ivm = np.empty((4, 4))
+            for i in range(4):
+                ivm[i, 0] = camera_info['rotation'][0][i] if i < 3 else 0.0
+                ivm[i, 1] = camera_info['rotation'][1][i] if i < 3 else 0.0
+                ivm[i, 2] = camera_info['rotation'][2][i] if i < 3 else 0.0
+                ivm[i, 3] = camera_info['position'][i] if i < 3 else 1.0
+            vm = np.linalg.inv(ivm)
+            view_matrix_array = np.empty(16)
+            for i in range(4):
+                for j in range(4):
+                    view_matrix_array[i * 4 + j] = vm[j, i]
+            vpt_renderer.module().overwrite_camera_view_matrix(view_matrix_array)
+
         #torch.cuda.synchronize()
 
         #img_name = f'img_{i}.exr'
@@ -641,53 +667,60 @@ if __name__ == '__main__':
         #image_cloud_only = vpt_renderer.module().get_feature_map_from_string(test_tensor_cuda, 'Cloud Only')
         #save_tensor_openexr(f'{out_dir}/{fg_name}', image_cloud_only.cpu().numpy(), use_alpha=True)
 
-        vpt_test_tensor_cuda = vpt_renderer(test_tensor_cuda)
-        if gaussian_splatting_data:
-            fg_name = f'fg_{i}.png'
-            save_tensor_png(f'{out_dir}/images/{fg_name}', vpt_test_tensor_cuda.cpu().numpy())
-        else:
-            fg_name = f'fg_{i}.exr'
-            save_tensor_openexr(f'{out_dir}/{fg_name}', vpt_test_tensor_cuda.cpu().numpy(), use_alpha=True)
+        if 'img_name' not in camera_info:
+            vpt_test_tensor_cuda = vpt_renderer(test_tensor_cuda)
+            if gaussian_splatting_data:
+                fg_name = f'fg_{i}.png'
+                save_tensor_png(f'{out_dir}/images/{fg_name}', vpt_test_tensor_cuda.cpu().numpy())
+            else:
+                fg_name = f'fg_{i}.exr'
+                save_tensor_openexr(f'{out_dir}/{fg_name}', vpt_test_tensor_cuda.cpu().numpy(), use_alpha=True)
 
-        image_background = vpt_renderer.module().get_feature_map_from_string(test_tensor_cuda, 'Background')
-        if gaussian_splatting_data:
-            bg_name = f'bg_{i}.png'
-            save_tensor_png(f'{out_dir}/images/{bg_name}', image_background.cpu().numpy())
-        else:
-            bg_name = f'bg_{i}.exr'
-            save_tensor_openexr(f'{out_dir}/{bg_name}', image_background.cpu().numpy())
-        #save_camera_config(f'{out_dir}/intrinsics_{i}.txt', vpt_renderer.module().get_camera_view_matrix())
+            image_background = vpt_renderer.module().get_feature_map_from_string(test_tensor_cuda, 'Background')
+            if gaussian_splatting_data:
+                bg_name = f'bg_{i}.png'
+                save_tensor_png(f'{out_dir}/images/{bg_name}', image_background.cpu().numpy())
+            else:
+                bg_name = f'bg_{i}.exr'
+                save_tensor_openexr(f'{out_dir}/{bg_name}', image_background.cpu().numpy())
+            #save_camera_config(f'{out_dir}/intrinsics_{i}.txt', vpt_renderer.module().get_camera_view_matrix())
 
-        depth_name = f'depth_{i}.exr'
-        image_depth = vpt_renderer.module().get_feature_map_from_string(test_tensor_cuda, 'Depth Blended')
-        #mask = image_depth[1, :, :] > 1e-5
-        #image_depth[0, mask] /= image_depth[1, mask]
-        if gaussian_splatting_data:
-            save_tensor_openexr(f'{out_dir}/images/{depth_name}', image_depth.cpu().numpy())
+            depth_name = f'depth_{i}.exr'
+            image_depth = vpt_renderer.module().get_feature_map_from_string(test_tensor_cuda, 'Depth Blended')
+            #mask = image_depth[1, :, :] > 1e-5
+            #image_depth[0, mask] /= image_depth[1, mask]
+            if gaussian_splatting_data:
+                save_tensor_openexr(f'{out_dir}/images/{depth_name}', image_depth.cpu().numpy())
+            else:
+                save_tensor_openexr(f'{out_dir}/{depth_name}', image_depth.cpu().numpy())
         else:
-            save_tensor_openexr(f'{out_dir}/{depth_name}', image_depth.cpu().numpy())
+            vpt_test_tensor_cuda = vpt_renderer(test_tensor_cuda)
+            image_numpy = vpt_test_tensor_cuda.cpu().numpy()
+            image_numpy[3, :, :] = 1.0
+            img_name = f'img_{i}.png'
+            save_tensor_png(f'{out_dir}/images/{img_name}', image_numpy)
 
-        #vm = vpt_renderer.module().get_camera_view_matrix()
-        camera_info = dict()
-        camera_info['id'] = i
-        #camera_info['img_name'] = img_name
-        camera_info['fg_name'] = fg_name
-        camera_info['bg_name'] = bg_name
-        camera_info['width'] = image_width
-        camera_info['height'] = image_height
-        camera_info['position'] = [ivm[i, 3] for i in range(0, 3)]
-        camera_info['rotation'] = [
-            [ivm[i, 0] for i in range(0, 3)], [ivm[i, 1] for i in range(0, 3)], [ivm[i, 2] for i in range(0, 3)]
-        ]
-        #camera_info['view_matrix'] = [
-        #    [vm[i] for i in range(0, 4)], [vm[i] for i in range(4, 8)],
-        #    [vm[i] for i in range(8, 12)], [vm[i] for i in range(12, 16)]
-        #]
-        camera_info['fovy'] = vpt_renderer.module().get_camera_fovy()
-        camera_info['aabb'] = aabb
-        if test_case != 'HeadDVR':
-            camera_info['iso'] = iso_value
-        camera_infos.append(camera_info)
+        if args.camposes is None:
+            #vm = vpt_renderer.module().get_camera_view_matrix()
+            camera_info['id'] = i
+            #camera_info['img_name'] = img_name
+            camera_info['fg_name'] = fg_name
+            camera_info['bg_name'] = bg_name
+            camera_info['width'] = image_width
+            camera_info['height'] = image_height
+            camera_info['position'] = [ivm[i, 3] for i in range(0, 3)]
+            camera_info['rotation'] = [
+                [ivm[i, 0] for i in range(0, 3)], [ivm[i, 1] for i in range(0, 3)], [ivm[i, 2] for i in range(0, 3)]
+            ]
+            #camera_info['view_matrix'] = [
+            #    [vm[i] for i in range(0, 4)], [vm[i] for i in range(4, 8)],
+            #    [vm[i] for i in range(8, 12)], [vm[i] for i in range(12, 16)]
+            #]
+            camera_info['fovy'] = vpt_renderer.module().get_camera_fovy()
+            camera_info['aabb'] = aabb
+            if test_case != 'HeadDVR':
+                camera_info['iso'] = iso_value
+            camera_infos.append(camera_info)
         print(f'{i}/{num_frames}')
 
         if test_mode:

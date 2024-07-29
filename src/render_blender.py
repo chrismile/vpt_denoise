@@ -115,7 +115,7 @@ def setup_light(use_headlight):
     if use_envmap:
         world = bpy.context.scene.world
         env_image = bpy.data.images.load(
-            "/home/christoph/Programming/C++/CloudRendering/Data/CloudDataSets/env_maps/small_empty_room_1_4k_blurred_small.exr")
+            str(pathlib.Path.home()) + "/Programming/C++/CloudRendering/Data/CloudDataSets/env_maps/small_empty_room_1_4k_blurred_small.exr")
         node_environment = world.node_tree.nodes.new('ShaderNodeTexEnvironment')
         node_environment.image = env_image
         world.node_tree.links.new(node_environment.outputs["Color"],
@@ -272,6 +272,7 @@ if __name__ == '__main__':
     parser.add_argument('-r', '--img_res', type=int, default=1024)
     parser.add_argument('-n', '--num_frames', type=int, default=2)
     parser.add_argument('-s', '--num_samples', type=int, default=4)
+    parser.add_argument('-c', '--camposes')
     parser.add_argument('-o', '--out_dir')
     parser.add_argument('--use_const_seed', action='store_true', default=True)  # TODO
     parser.add_argument('--use_headlight', action='store_true', default=False)
@@ -387,34 +388,39 @@ if __name__ == '__main__':
     radii_sorted = sorted([rx, ry, rz])
     is_spherical = radii_sorted[2] / radii_sorted[0] < 1.9
 
-    print('Sampling camera poses...')
-    camera_infos = []
-    for frame_idx in range(num_frames):
-        if shall_sample_completely_random_views:
-            view_matrix_array, vm, ivm, _ = sample_random_view(aabb)
-        elif is_spherical:
-            view_matrix_array, vm, ivm = sample_view_matrix_circle(aabb)
-        else:
-            view_matrix_array, vm, ivm = sample_view_matrix_box(aabb)
+    if args.camposes is None:
+        print('Sampling camera poses...')
+        camera_infos = []
+        for frame_idx in range(num_frames):
+            if shall_sample_completely_random_views:
+                view_matrix_array, vm, ivm, _ = sample_random_view(aabb)
+            elif is_spherical:
+                view_matrix_array, vm, ivm = sample_view_matrix_circle(aabb)
+            else:
+                view_matrix_array, vm, ivm = sample_view_matrix_box(aabb)
 
-        fg_name = f'fg_{frame_idx}.png'
-        camera_info = dict()
-        camera_info['id'] = frame_idx
-        camera_info['fg_name'] = fg_name
-        camera_info['width'] = image_width
-        camera_info['height'] = image_height
-        camera_info['position'] = [ivm[i, 3] for i in range(0, 3)]
-        camera_info['rotation'] = [
-            [ivm[i, 0] for i in range(0, 3)], [ivm[i, 1] for i in range(0, 3)], [ivm[i, 2] for i in range(0, 3)]
-        ]
-        camera_info['fovy'] = fovy
-        camera_info['aabb'] = aabb
-        if test_case != 'HeadDVR':
-            camera_info['iso'] = iso_value
-        camera_infos.append(camera_info)
-        print(f'{frame_idx}/{num_frames}')
-    with open(f'{out_dir}/cameras.json', 'w') as f:
-        json.dump(camera_infos, f, ensure_ascii=False, indent=4)
+            fg_name = f'fg_{frame_idx}.png'
+            camera_info = dict()
+            camera_info['id'] = frame_idx
+            camera_info['fg_name'] = fg_name
+            camera_info['width'] = image_width
+            camera_info['height'] = image_height
+            camera_info['position'] = [ivm[i, 3] for i in range(0, 3)]
+            camera_info['rotation'] = [
+                [ivm[i, 0] for i in range(0, 3)], [ivm[i, 1] for i in range(0, 3)], [ivm[i, 2] for i in range(0, 3)]
+            ]
+            camera_info['fovy'] = fovy
+            camera_info['aabb'] = aabb
+            if test_case != 'HeadDVR':
+                camera_info['iso'] = iso_value
+            camera_infos.append(camera_info)
+            print(f'{frame_idx}/{num_frames}')
+        with open(f'{out_dir}/cameras.json', 'w') as f:
+            json.dump(camera_infos, f, ensure_ascii=False, indent=4)
+    else:
+        with open(args.camposes, 'r') as f:
+            camera_infos = json.load(f)
+
 
     if use_isosurface:
         print('Creating isosurface data...')
