@@ -251,6 +251,10 @@ def check_camera_is_valid(occupation_volume, aabb, view_matrix, inverse_view_mat
 
 
 if __name__ == '__main__':
+    default_envmap = \
+        str(pathlib.Path.home()) \
+        + '/Programming/C++/CloudRendering/Data/CloudDataSets/env_maps/small_empty_room_1_4k_blurred_large.exr'
+
     parser = argparse.ArgumentParser(
         prog='vpt_denoise',
         description='Generates volumetric path tracing images.')
@@ -258,6 +262,7 @@ if __name__ == '__main__':
     parser.add_argument('-r', '--img_res', type=int, default=1024)
     parser.add_argument('-n', '--num_frames', type=int, default=2)
     parser.add_argument('-o', '--out_dir')
+    parser.add_argument('--envmap', default=default_envmap)
     parser.add_argument('--use_const_seed', action='store_true', default=True)
     parser.add_argument('--use_headlight', action='store_true', default=False)
     parser.add_argument('--device_idx', type=int, default=0)
@@ -344,9 +349,7 @@ if __name__ == '__main__':
     elif test_case == 'Brain':
         vpt_renderer.module().load_volume_file(
             str(pathlib.Path.home()) + '/datasets/Siemens/brain_cleaned/23.42um_4_cleaned.dat')
-    vpt_renderer.module().load_environment_map(
-        str(pathlib.Path.home())
-        + '/Programming/C++/CloudRendering/Data/CloudDataSets/env_maps/small_empty_room_1_4k_blurred_large.exr')
+    vpt_renderer.module().load_environment_map(args.envmap)
     vpt_renderer.module().set_use_transfer_function(True)
 
     #mode = 'Delta Tracking'
