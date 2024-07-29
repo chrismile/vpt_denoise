@@ -101,13 +101,38 @@ commands = [
     #    os.path.join(pathlib.Path.home(), 'Programming/C++/CloudRendering/Data/CloudDataSets/env_maps/constant.exr'),
     #    '-o', os.path.join(pathlib.Path.home(), 'datasets/VPT/brain/preset3')
     #],
+
+    # Cloud data
+    [
+        'python3', 'src/main.py',
+        #'python3', 'src/render_blender.py',
+        '--use_black_bg', '--scale_pos', '0.5',
+        #'--num_frames', '4',
+        '--file', '/home/neuhauser/datasets/Han/cloud_simulation_cameras/incomming_0057/incomming_0057.vdb',
+        '--camposes', '/home/neuhauser/datasets/Han/cloud_simulation_cameras/incomming_0057/images.json',
+        '--img_res', '1024', '--num_samples', '256', '--denoiser', 'Default',
+        '--scattering_albedo', '0.99', '--extinction_scale', '400.0',
+        '-o', os.path.join(pathlib.Path.home(), 'datasets/VPT/multiclouds/spp_256_optix/incomming_0057')
+    ],
+    [
+        'python3', 'src/main.py',
+        # 'python3', 'src/render_blender.py',
+        '--use_black_bg', '--scale_pos', '0.5',
+        #'--num_frames', '4',
+        '--file', '/home/neuhauser/datasets/Han/cloud_simulation_cameras/incomming_0057/incomming_0057.vdb',
+        '--camposes', '/home/neuhauser/datasets/Han/cloud_simulation_cameras/incomming_0057/images.json',
+        '--img_res', '1024', '--num_samples', '256', '--denoiser', 'None',
+        '--scattering_albedo', '0.99', '--extinction_scale', '400.0',
+        '-o', os.path.join(pathlib.Path.home(), 'datasets/VPT/multiclouds/spp_256_noisy/incomming_0057')
+    ],
 ]
 
 
 # The following code is for training 3DGS models; the script train.py is currently not yet publicly released.
+shall_train_3dgs = False
 train_script = os.path.join(pathlib.Path.home(), 'Programming/DL/gaussian_me/train.py')
 train_3dgs = os.path.exists(train_script)
-if train_3dgs:
+if shall_train_3dgs and train_3dgs:
     scenes = ["brain"]
     #presets = [1, 2]
     #presets = [1]
@@ -128,8 +153,8 @@ if train_3dgs:
         ])
 
 
-
 if __name__ == '__main__':
+    shall_send_email = False
     pwd_path = os.path.join(pathlib.Path.home(), 'Documents', 'mailpwd.txt')
     use_email = pathlib.Path(pwd_path).is_file()
     if use_email:
@@ -175,27 +200,38 @@ if __name__ == '__main__':
                 message_text_html += '---</font>\n'
                 message_text_html += '</body>\n</html>'
 
-                send_mail(
-                    sender_name, sender_email_address, user_name, password,
-                    recipient_name, recipient_email_address,
-                    'Error while generating images', message_text_raw, message_text_html)
+                if shall_send_email:
+                    send_mail(
+                        sender_name, sender_email_address, user_name, password,
+                        recipient_name, recipient_email_address,
+                        'Error while generating images', message_text_raw, message_text_html)
 
             print('--- Output from stdout ---')
-            print(stderr_string.rstrip('\n'))
+            print(stdout_string.rstrip('\n'))
             print('---\n')
             print('--- Output from stderr ---', file=sys.stderr)
             print(stderr_string.rstrip('\n'), file=sys.stderr)
             print('---', file=sys.stderr)
             sys.exit(1)
             #raise Exception(f'Process returned error code {proc_status}.')
+        elif not shall_send_email:
+            stderr_string = err.decode('utf-8')
+            stdout_string = output.decode('utf-8')
+            print('--- Output from stdout ---')
+            print(stdout_string.rstrip('\n'))
+            print('---\n')
+            print('--- Output from stderr ---', file=sys.stderr)
+            print(stderr_string.rstrip('\n'), file=sys.stderr)
+            print('---', file=sys.stderr)
 
     message_text_raw = 'run.py finished successfully'
     message_text_html = \
         '<html>\n<head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"></head>\n<body>\n'
     message_text_html += 'run.py finished successfully'
     message_text_html += '</body>\n</html>'
-    send_mail(
-        sender_name, sender_email_address, user_name, password,
-        recipient_name, recipient_email_address,
-        'run.py finished successfully', message_text_raw, message_text_html)
+    if shall_send_email:
+        send_mail(
+            sender_name, sender_email_address, user_name, password,
+            recipient_name, recipient_email_address,
+            'run.py finished successfully', message_text_raw, message_text_html)
     print('Finished.')

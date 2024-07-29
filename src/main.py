@@ -35,16 +35,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.spatial.transform import Rotation as Rotation
 import torch
-#conda install -c conda-forge openexr-python
-import OpenEXR
-import Imath
-from PIL import Image
 import array
 from vpt import VolumetricPathTracingRenderer
 import time
 import argparse
 #from netCDF4 import Dataset
 from src.util.sample_view import *
+from src.util.save_tensor import *
 
 # Bayesian optimization
 # conda install -c conda-forge bayesian-optimization
@@ -63,44 +60,6 @@ import pylimbo
 #    outfield_den = ncfile.createVariable('density', np.float32, ('z', 'y', 'x'))
 #    outfield_den[:, :, :] = data[:, :, :]
 #    ncfile.close()
-
-
-def save_tensor_openexr(file_path, data, dtype=np.float16, use_alpha=False):
-    if dtype == np.float32:
-        pt = Imath.PixelType(Imath.PixelType.FLOAT)
-    elif dtype == np.float16:
-        pt = Imath.PixelType(Imath.PixelType.HALF)
-    else:
-        raise Exception('Error in save_tensor_openexr: Invalid format.')
-    if data.dtype != dtype:
-        data = data.astype(dtype)
-    header = OpenEXR.Header(data.shape[2], data.shape[1])
-    if use_alpha:
-        header['channels'] = {
-            'R': Imath.Channel(pt), 'G': Imath.Channel(pt), 'B': Imath.Channel(pt), 'A': Imath.Channel(pt)
-        }
-    else:
-        header['channels'] = {'R': Imath.Channel(pt), 'G': Imath.Channel(pt), 'B': Imath.Channel(pt)}
-    out = OpenEXR.OutputFile(file_path, header)
-    reds = data[0, :, :].tobytes()
-    greens = data[1, :, :].tobytes()
-    blues = data[2, :, :].tobytes()
-    if use_alpha:
-        alphas = data[3, :, :].tobytes()
-        out.writePixels({'R': reds, 'G': greens, 'B': blues, 'A': alphas})
-    else:
-        out.writePixels({'R': reds, 'G': greens, 'B': blues})
-
-
-def save_tensor_png(file_path, data):
-    # Convert linear RGB to sRGB.
-    for i in range(3):
-        data[i, :, :] = np.power(data[i, :, :], 1.0 / 2.2)
-    data = np.clip(data, 0.0, 1.0)
-    data = data.transpose(1, 2, 0)
-    data = (data * 255).astype('uint8')
-    image_out = Image.fromarray(data)
-    image_out.save(file_path)
 
 
 class Plane:
@@ -259,14 +218,26 @@ if __name__ == '__main__':
         prog='vpt_denoise',
         description='Generates volumetric path tracing images.')
     parser.add_argument('-t', '--test_case', default='Wholebody')
+    parser.add_argument('-f', '--file')
     parser.add_argument('-r', '--img_res', type=int, default=1024)
-    parser.add_argument('-n', '--num_frames', type=int, default=2)
+    parser.add_argument('-n', '--num_frames', type=int)  # , default=128
+    parser.add_argument('-s', '--num_samples', type=int, default=256)
     parser.add_argument('-c', '--camposes')
     parser.add_argument('-o', '--out_dir')
+    parser.add_argument('--use_const_seed', action='store_true', default=False)
     parser.add_argument('--envmap', default=default_envmap)
-    parser.add_argument('--use_const_seed', action='store_true', default=True)
     parser.add_argument('--use_headlight', action='store_true', default=False)
+    parser.add_argument('--use_black_bg', action='store_true', default=False)
+    parser.add_argument('--denoiser')
     parser.add_argument('--device_idx', type=int, default=0)
+    parser.add_argument('--debug', action='store_true', default=False)
+    # Custom settings.
+    parser.add_argument('--transfer_function')
+    parser.add_argument('--transfer_function_grad')
+    parser.add_argument('--iso_value', type=float)
+    parser.add_argument('--scattering_albedo', type=float, default=0.99)
+    parser.add_argument('--extinction_scale', type=float, default=400.0)
+    parser.add_argument('--scale_pos', type=float, default=0.5)
     args = parser.parse_args()
 
     test_case = args.test_case
@@ -277,6 +248,13 @@ if __name__ == '__main__':
     #test_case = 'Cloud'
     #test_case = 'Cloud Fog'
     #test_case = 'Brain'
+    if args.file is not None:
+        test_case = 'Custom'
+        #if args.num_files is None:
+        #    custom_files.append(args.file)
+        #else:
+        #    for i in range(args.num_files):
+        #        custom_files.append(args.file % i)
 
     if args.use_const_seed:
         random.seed(31)
@@ -332,7 +310,9 @@ if __name__ == '__main__':
         data_dir = '/media/christoph/Elements/Datasets/Scalar/'
     if not os.path.isdir(data_dir):
         data_dir = '/home/christoph/datasets/Flow/Scalar/'
-    if test_case == 'Wholebody':
+    if test_case == 'Custom':
+        vpt_renderer.module().load_volume_file(args.file)
+    elif test_case == 'Wholebody':
         vpt_renderer.module().load_volume_file(
             data_dir + 'Wholebody [512 512 3172] (CT)/wholebody.dat')
     elif test_case == 'Angiography':
@@ -382,10 +362,17 @@ if __name__ == '__main__':
     denoiser_name = 'None'
     if mode != 'Ray Marching (Emission/Absorption)':
         denoiser_name = 'OptiX Denoiser'
+    if args.denoiser is not None:
+        if args.denoiser == 'Default':
+            denoiser_name = 'OptiX Denoiser'
+        else:
+            denoiser_name = args.denoiser
     if denoiser_name != 'None' and test_case != 'Cloud' and test_case != 'Cloud Fog':
         vpt_renderer.module().set_denoiser(denoiser_name)
 
     spp = 256
+    if args.num_samples is not None:
+        spp = args.num_samples
     if mode == 'Delta Tracking':
         spp = 16384
     elif mode == 'Next Event Tracking':
@@ -408,7 +395,24 @@ if __name__ == '__main__':
     vpt_renderer.module().set_vpt_mode_from_name(mode)
 
     iso_value = 0.0
-    if test_case == 'Wholebody':
+    if test_case == 'Custom':
+        vpt_renderer.module().set_use_transfer_function(args.transfer_function is not None)
+        if args.transfer_function is not None:
+            vpt_renderer.module().load_transfer_function_file(args.transfer_function)
+            if args.transfer_function_grad is not None:
+                vpt_renderer.module().load_transfer_function_file_gradient(args.transfer_function)
+        vpt_renderer.module().set_use_isosurfaces(args.iso_value is not None)
+        if args.iso_value is not None:
+            iso_value = args.iso_value
+        vpt_renderer.module().set_scattering_albedo([args.scattering_albedo, args.scattering_albedo, args.scattering_albedo])
+        vpt_renderer.module().set_extinction_scale(args.extinction_scale)
+        # TODO
+        #if args.use_headlight:
+        #    vpt_renderer.module().set_use_headlight(True)
+        #    vpt_renderer.module().set_use_builtin_environment_map('Black')
+        #    vpt_renderer.module().set_use_headlight_distance(False)
+        #    vpt_renderer.module().set_headlight_intensity(6.0)
+    elif test_case == 'Wholebody':
         vpt_renderer.module().set_use_isosurfaces(True)
         use_gradient_mode = False
         if use_gradient_mode:
@@ -519,7 +523,16 @@ if __name__ == '__main__':
         with open(args.camposes, 'r') as f:
             camera_infos = json.load(f)
 
-    num_frames = args.num_frames
+    if args.num_frames is not None:
+        num_frames = args.num_frames
+        if args.camposes is not None:
+            num_frames = min(num_frames, len(camera_infos))
+    else:
+        if args.camposes is not None:
+            num_frames = len(camera_infos)
+        else:
+            num_frames = 128
+
     for i in range(num_frames):
         if use_mixed_mode:
             use_visibility_aware_sampling = i >= num_frames // 2
@@ -648,17 +661,20 @@ if __name__ == '__main__':
             #    [ivm[i, 0] for i in range(0, 3)], [ivm[i, 1] for i in range(0, 3)], [ivm[i, 2] for i in range(0, 3)]
             #]
             ivm = np.empty((4, 4))
-            for i in range(4):
-                ivm[i, 0] = camera_info['rotation'][0][i] if i < 3 else 0.0
-                ivm[i, 1] = camera_info['rotation'][1][i] if i < 3 else 0.0
-                ivm[i, 2] = camera_info['rotation'][2][i] if i < 3 else 0.0
-                ivm[i, 3] = camera_info['position'][i] if i < 3 else 1.0
+            for k in range(4):
+                ivm[k, 0] = camera_info['rotation'][0][k] if k < 3 else 0.0
+                ivm[k, 1] = camera_info['rotation'][1][k] if k < 3 else 0.0
+                ivm[k, 2] = camera_info['rotation'][2][k] if k < 3 else 0.0
+                ivm[k, 3] = camera_info['position'][k] * args.scale_pos if k < 3 else 1.0
             vm = np.linalg.inv(ivm)
             view_matrix_array = np.empty(16)
-            for i in range(4):
+            for k in range(4):
                 for j in range(4):
-                    view_matrix_array[i * 4 + j] = vm[j, i]
+                    view_matrix_array[k * 4 + j] = vm[j, k]
             vpt_renderer.module().overwrite_camera_view_matrix(view_matrix_array)
+            fovy = camera_info['fovy']
+            if abs(fovy - vpt_renderer.module().get_camera_fovy()) > 1e-4:
+                vpt_renderer.module().set_camera_fovy(camera_info['fovy'])
 
         #torch.cuda.synchronize()
 
@@ -699,8 +715,10 @@ if __name__ == '__main__':
         else:
             vpt_test_tensor_cuda = vpt_renderer(test_tensor_cuda)
             image_numpy = vpt_test_tensor_cuda.cpu().numpy()
-            image_numpy[3, :, :] = 1.0
+            if args.use_black_bg:
+                image_numpy[3, :, :] = 1.0
             img_name = f'img_{i}.png'
+            print(f'{out_dir}/images/{img_name}')
             save_tensor_png(f'{out_dir}/images/{img_name}', image_numpy)
 
         if args.camposes is None:

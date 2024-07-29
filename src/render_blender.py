@@ -28,6 +28,7 @@ import json
 import numpy as np
 from vpt import VolumetricPathTracingRenderer
 from src.util.sample_view import *
+from src.util.save_tensor import *
 
 # pip install bpy mathutils
 import bpy
@@ -71,9 +72,19 @@ def prepare_rendering():
     if transparent_background:
         bpy.context.scene.render.film_transparent = True
 
-    bpy.context.scene.cycles.use_denoising = True
-    bpy.context.scene.cycles.denoiser = 'OPENIMAGEDENOISE'
-    #bpy.context.scene.cycles.denoiser = 'OPTIX'
+    denoiser = 'Default'
+    if args.denoiser is not None:
+        denoiser = args.denoiser
+    if denoiser == 'None':
+        bpy.context.scene.cycles.use_denoising = False
+    else:
+        bpy.context.scene.cycles.use_denoising = True
+        if denoiser == 'OptiX Denoiser':
+            bpy.context.scene.cycles.denoiser = 'OPTIX'
+        elif denoiser == 'OpenImageDenoise' or args.denoiser == 'Default':
+            bpy.context.scene.cycles.denoiser = 'OPENIMAGEDENOISE'
+        else:
+            bpy.context.scene.cycles.denoiser = args.denoiser
     #bpy.context.scene.cycles.denoising_input_passes = 'RGB'
     bpy.context.scene.cycles.denoising_input_passes = 'RGB_ALBEDO_NORMAL'
     #bpy.context.scene.cycles.denoising_input_passes = 'RGB_ALBEDO'
@@ -83,7 +94,7 @@ def prepare_rendering():
     bpy.context.preferences.addons["cycles"].preferences.compute_device_type = "OPTIX"  # Alternative: 'NONE', 'CUDA', 'OPTIX', 'HIP', 'ONEAPI'
     bpy.context.scene.cycles.device = "GPU"
     bpy.context.scene.cycles.samples = 4
-    bpy.context.scene.cycles.volume_bounces = 4
+    bpy.context.scene.cycles.volume_bounces = 16
     # https://docs.blender.org/api/2.80/bpy.types.CyclesWorldSettings.html
     #bpy.context.scene.cycles.volume_sampling = 'DISTANCE', 'EQUIANGULAR', 'MULTIPLE_IMPORTANCE'
     bpy.context.preferences.addons["cycles"].preferences.get_devices()
@@ -231,15 +242,29 @@ def setup_volume():
     # (12, "Weight")
     #for i, o in enumerate(principled_volume.inputs):
     #    print(i, o.name)
-    principled_volume.inputs[0].default_value = (0.499793, 0.104998, 0.124452, 1)
-    principled_volume.inputs['Density'].default_value = 1000.0
+    if test_case == 'Custom':
+        principled_volume.inputs[0].default_value = (0.8, 0.8, 0.8, 1)
+    else:
+        principled_volume.inputs[0].default_value = (0.499793, 0.104998, 0.124452, 1)
+    if args.scattering_albedo:
+        a_val = 1.0 - args.scattering_albedo
+        principled_volume.inputs['Absorption Color'].default_value = (a_val, a_val, a_val, 1)
+    if args.extinction_scale:
+        density = args.extinction_scale * 10.0
+        principled_volume.inputs['Density'].default_value = density
+    else:
+        principled_volume.inputs['Density'].default_value = 1000.0
     principled_volume.inputs['Anisotropy'].default_value = 0.5
 
 
 def setup_cam_poses(camera, pointlight):
     for frame_idx in range(num_frames):
         camera_info = camera_infos[frame_idx]
-        location = (camera_info['position'][0], camera_info['position'][1], camera_info['position'][2])
+        location = (
+            camera_info['position'][0] * args.scale_pos,
+            camera_info['position'][1] * args.scale_pos,
+            camera_info['position'][2] * args.scale_pos
+        )
         rot_mat = camera_info['rotation']
         rot_mat_inv = [[rot_mat[j][i] for j in range(0, 3)] for i in range(3)]
         orientation = mathutils.Matrix(rot_mat_inv)
@@ -260,26 +285,47 @@ def setup_cam_poses(camera, pointlight):
 def bpy_render(output_dir, output_file_pattern_string='fg_%d.png'):
     for frame_idx in range(num_frames):
         bpy.context.scene.frame_set(frame_idx + 1)
-        bpy.context.scene.render.filepath = os.path.join(output_dir, (output_file_pattern_string % frame_idx))
+        image_path = os.path.join(output_dir, (output_file_pattern_string % frame_idx))
+        bpy.context.scene.render.filepath = image_path
         bpy.ops.render.render(write_still=True)
+        if args.use_black_bg:
+            convert_image_black_background(image_path)
 
 
 if __name__ == '__main__':
+    default_envmap = \
+        str(pathlib.Path.home()) \
+        + '/Programming/C++/CloudRendering/Data/CloudDataSets/env_maps/small_empty_room_1_4k_blurred_large.exr'
+
     parser = argparse.ArgumentParser(
         prog='vpt_denoise',
         description='Generates volumetric path tracing images.')
     parser.add_argument('-t', '--test_case', default='Wholebody')
+    parser.add_argument('-f', '--file')
     parser.add_argument('-r', '--img_res', type=int, default=1024)
-    parser.add_argument('-n', '--num_frames', type=int, default=2)
+    parser.add_argument('-n', '--num_frames', type=int)  # , default=128
     parser.add_argument('-s', '--num_samples', type=int, default=4)
     parser.add_argument('-c', '--camposes')
     parser.add_argument('-o', '--out_dir')
-    parser.add_argument('--use_const_seed', action='store_true', default=True)  # TODO
+    parser.add_argument('--use_const_seed', action='store_true', default=True)
+    parser.add_argument('--envmap', default=default_envmap)
     parser.add_argument('--use_headlight', action='store_true', default=False)
+    parser.add_argument('--use_black_bg', action='store_true', default=False)
+    parser.add_argument('--denoiser')
     parser.add_argument('--debug', action='store_true', default=True)  # TODO
+    # Custom settings.
+    parser.add_argument('--transfer_function')
+    parser.add_argument('--transfer_function_grad')
+    parser.add_argument('--iso_value', type=float)
+    parser.add_argument('--scattering_albedo', type=float, default=0.99)
+    parser.add_argument('--extinction_scale', type=float, default=400.0)
+    parser.add_argument('--scale_pos', type=float, default=0.5)
     args = parser.parse_args()
 
     test_case = args.test_case
+    if args.file is not None:
+        test_case = 'Custom'
+
     vpt_renderer = VolumetricPathTracingRenderer()
 
     if args.use_const_seed:
@@ -291,6 +337,8 @@ if __name__ == '__main__':
     image_height = args.img_res
     aspect = image_width / image_height
     transparent_background = False  # TODO
+    if args.use_black_bg:
+        transparent_background = True
     use_envmap = not args.use_headlight
     fovy = math.atan(1.0 / 2.0) * 2.0
     shall_sample_completely_random_views = False
@@ -311,7 +359,9 @@ if __name__ == '__main__':
         data_dir = '/media/christoph/Elements/Datasets/Scalar/'
     if not os.path.isdir(data_dir):
         data_dir = '/home/christoph/datasets/Flow/Scalar/'
-    if test_case == 'Wholebody':
+    if test_case == 'Custom':
+        vpt_renderer.module().load_volume_file(args.file)
+    elif test_case == 'Wholebody':
         vpt_renderer.module().load_volume_file(
             data_dir + 'Wholebody [512 512 3172] (CT)/wholebody.dat')
     elif test_case == 'Angiography':
@@ -362,7 +412,24 @@ if __name__ == '__main__':
     iso_value = 0.0
     use_isosurface = False
     use_volume = True
-    if test_case == 'Wholebody':
+    if test_case == 'Custom':
+        vpt_renderer.module().set_use_transfer_function(args.transfer_function is not None)
+        if args.transfer_function is not None:
+            vpt_renderer.module().load_transfer_function_file(args.transfer_function)
+            if args.transfer_function_grad is not None:
+                vpt_renderer.module().load_transfer_function_file_gradient(args.transfer_function)
+        use_isosurface = args.iso_value is not None
+        if args.iso_value is not None:
+            iso_value = args.iso_value
+        #vpt_renderer.module().set_scattering_albedo([args.scattering_albedo, args.scattering_albedo, args.scattering_albedo])
+        #vpt_renderer.module().set_extinction_scale(args.extinction_scale)
+        # TODO
+        #if args.use_headlight:
+        #    vpt_renderer.module().set_use_headlight(True)
+        #    vpt_renderer.module().set_use_builtin_environment_map('Black')
+        #    vpt_renderer.module().set_use_headlight_distance(False)
+        #    vpt_renderer.module().set_headlight_intensity(6.0)
+    elif test_case == 'Wholebody':
         use_isosurface = True
         use_gradient_mode = False
         if use_gradient_mode:

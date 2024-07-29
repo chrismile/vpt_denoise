@@ -694,6 +694,9 @@ if __name__ == '__main__':
     fovy = vpt_renderer.module().get_camera_fovy()
     num_frames = 32
 
+    # Setting font type is necessary for VMV (Symposium on Vision, Modeling, and Visualization) submission.
+    matplotlib.rcParams['pdf.fonttype'] = 42
+    matplotlib.rcParams['ps.fonttype'] = 42
     matplotlib.rcParams.update({'font.family': 'Linux Biolinum O'})
     matplotlib.rcParams.update({'font.size': 17.5})
 
