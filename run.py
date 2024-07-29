@@ -86,7 +86,7 @@ def escape_html(s):
 commands = [
     #[
     #    'python3', 'src/main.py', '--img_res', '2048', '--num_frames', '128',
-    #    '-o', os.path.join(pathlib.Path.home(), 'datasets/VPT/brain/preset1')
+    #    '--use_headlight', '-o', os.path.join(pathlib.Path.home(), 'datasets/VPT/brain/preset1')
     #],
     #[
     #    'python3', 'src/main.py', '--img_res', '2048', '--num_frames', '128',
@@ -95,6 +95,12 @@ commands = [
     #[
     #    'python3', os.path.join(pathlib.Path.home(), 'Programming/DL/gaussian_me/run.py')
     #]
+    #[
+    #    'python3', 'src/main.py', '--img_res', '2048', '--num_frames', '128',
+    #    '--envmap',
+    #    os.path.join(pathlib.Path.home(), 'Programming/C++/CloudRendering/Data/CloudDataSets/env_maps/constant.exr'),
+    #    '-o', os.path.join(pathlib.Path.home(), 'datasets/VPT/brain/preset3')
+    #],
 ]
 
 
@@ -103,7 +109,9 @@ train_script = os.path.join(pathlib.Path.home(), 'Programming/DL/gaussian_me/tra
 train_3dgs = os.path.exists(train_script)
 if train_3dgs:
     scenes = ["brain"]
-    presets = [1, 2]
+    #presets = [1, 2]
+    #presets = [1]
+    presets = [3]
     settings = list(itertools.product(scenes, presets))
     for (scene, preset) in settings:
         scene_path = os.path.join(pathlib.Path.home(), "datasets/VPT", scene, f"preset{preset}")
@@ -115,7 +123,7 @@ if train_3dgs:
             '--eval',
             '--test_iterations', '7000', '15000', '30000',
             '--images', 'images',
-            '--densify_grad_threshold', '0.0001',
+            '--densify_grad_threshold', '0.0001',  # '0.0001',
             '--save_iterations', '7000', '15000', '30000'
         ])
 
