@@ -27,8 +27,8 @@ import pathlib
 import json
 import numpy as np
 from vpt import VolumetricPathTracingRenderer
-from src.util.sample_view import *
-from src.util.save_tensor import *
+from .util.sample_view import *
+from .util.save_tensor import *
 
 # pip install bpy mathutils
 import bpy

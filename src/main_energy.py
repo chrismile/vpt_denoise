@@ -42,7 +42,7 @@ import array
 from vpt import VolumetricPathTracingRenderer
 import time
 #from netCDF4 import Dataset
-from src.util.sample_view import *
+from .util.sample_view import *
 
 # Bayesian optimization
 # conda install -c conda-forge bayesian-optimization
