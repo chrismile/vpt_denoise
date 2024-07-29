@@ -177,7 +177,7 @@ if shall_train_3dgs and train_3dgs:
 
 
 if __name__ == '__main__':
-    shall_send_email = False
+    shall_send_email = True
     pwd_path = os.path.join(pathlib.Path.home(), 'Documents', 'mailpwd.txt')
     use_email = pathlib.Path(pwd_path).is_file()
     if use_email:
