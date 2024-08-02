@@ -161,10 +161,10 @@ for samples in [4, 256]:
         os.path.join(pathlib.Path.home(), 'Programming/C++/CloudRendering/Data/CloudDataSets/env_maps/environment_han.exr'),
         '--file', os.path.join(pathlib.Path.home(), 'datasets/Han/cloud_simulation_cameras/incomming_0050/incomming_0050.vdb'),
         '--camposes', os.path.join(pathlib.Path.home(), 'datasets/Han/cloud_simulation_cameras/incomming_0050/images.json'),
-        '--img_res', '1024', '--num_samples', f'{samples}', '--denoiser', 'PyTorch Denoiser', '--pytorch_denoiser_model_file',
+        '--img_res', '1024', '--num_samples', f'{samples}', '--denoiser', 'PyTorch Denoiser Module', '--pytorch_denoiser_model_file',
         os.path.join(pathlib.Path.home(), 'Programming/C++/CloudRendering/Data/PyTorch/timm/network_main.pt'),
         '--scattering_albedo', '0.99', '--extinction_scale', '400.0',
-        '-o', os.path.join(pathlib.Path.home(), f'datasets/VPT/multiclouds/spp_{samples}_optix/incomming_0050')
+        '-o', os.path.join(pathlib.Path.home(), f'datasets/VPT/multiclouds/spp_{samples}_pytorch/incomming_0050')
     ])
 
 # The following code is for training 3DGS models; the script train.py is currently not yet publicly released.
