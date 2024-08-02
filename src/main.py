@@ -229,6 +229,8 @@ if __name__ == '__main__':
     parser.add_argument('--use_headlight', action='store_true', default=False)
     parser.add_argument('--use_black_bg', action='store_true', default=False)
     parser.add_argument('--denoiser')
+    parser.add_argument('--pytorch_denoiser_model_file')  # Only if denoiser name starts with 'PyTorch'
+    parser.add_argument('--write_performance_info', action='store_true', default=False)
     parser.add_argument('--device_idx', type=int, default=0)
     parser.add_argument('--debug', action='store_true', default=False)
     # Custom settings.
@@ -369,6 +371,9 @@ if __name__ == '__main__':
             denoiser_name = args.denoiser
     if denoiser_name != 'None' and test_case != 'Cloud' and test_case != 'Cloud Fog':
         vpt_renderer.module().set_denoiser(denoiser_name)
+    if denoiser_name.startswith('PyTorch') and args.pytorch_denoiser_model_file is not None:
+        vpt_renderer.module().set_pytorch_denoiser_model_file(args.pytorch_denoiser_model_file)
+
 
     spp = 256
     if args.num_samples is not None:
@@ -760,5 +765,9 @@ if __name__ == '__main__':
 
     with open(f'{out_dir}/cameras.json', 'w') as f:
         json.dump(camera_infos, f, ensure_ascii=False, indent=4)
+
+    if args.write_performance_info:
+        with open(f'{out_dir}/performance.txt', 'w') as f:
+            f.write(f'{end - start}s for {num_frames} - {(end - start) / num_frames} fps')
 
     del vpt_renderer

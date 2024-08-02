@@ -312,6 +312,7 @@ if __name__ == '__main__':
     parser.add_argument('--use_headlight', action='store_true', default=False)
     parser.add_argument('--use_black_bg', action='store_true', default=False)
     parser.add_argument('--denoiser')
+    parser.add_argument('--write_performance_info', action='store_true', default=False)
     parser.add_argument('--debug', action='store_true', default=True)  # TODO
     # Custom settings.
     parser.add_argument('--transfer_function')
@@ -516,6 +517,10 @@ if __name__ == '__main__':
     bpy_render(os.path.join(out_dir, 'images'))
     end = time.time()
     print(f'Elapsed time: {end - start}s')
+
+    if args.write_performance_info:
+        with open(f'{out_dir}/performance.txt', 'w') as f:
+            f.write(f'{end - start}s for {num_frames} - {(end - start) / num_frames} fps')
 
     # Clean up.
     if use_volume and not args.debug:
