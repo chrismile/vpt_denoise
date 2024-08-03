@@ -520,7 +520,7 @@ if __name__ == '__main__':
 
     if args.write_performance_info:
         with open(f'{out_dir}/performance.txt', 'w') as f:
-            f.write(f'{end - start}s for {num_frames} - {(end - start) / num_frames} fps')
+            f.write(f'Render time: {end - start}s for {num_frames} - {(end - start) / num_frames}s/frame\n')
 
     # Clean up.
     if use_volume and not args.debug:

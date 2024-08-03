@@ -538,6 +538,7 @@ if __name__ == '__main__':
         else:
             num_frames = 128
 
+    render_time = 0.0
     for i in range(num_frames):
         if use_mixed_mode:
             use_visibility_aware_sampling = i >= num_frames // 2
@@ -691,8 +692,10 @@ if __name__ == '__main__':
         #image_cloud_only = vpt_renderer.module().get_feature_map_from_string(test_tensor_cuda, 'Cloud Only')
         #save_tensor_openexr(f'{out_dir}/{fg_name}', image_cloud_only.cpu().numpy(), use_alpha=True)
 
+        begin_render = time.time()
         if 'img_name' not in camera_info:
             vpt_test_tensor_cuda = vpt_renderer(test_tensor_cuda)
+            render_time += time.time() - begin_render
             if gaussian_splatting_data:
                 fg_name = f'fg_{i}.png'
                 save_tensor_png(f'{out_dir}/images/{fg_name}', vpt_test_tensor_cuda.cpu().numpy())
@@ -719,6 +722,7 @@ if __name__ == '__main__':
                 save_tensor_openexr(f'{out_dir}/{depth_name}', image_depth.cpu().numpy())
         else:
             vpt_test_tensor_cuda = vpt_renderer(test_tensor_cuda)
+            render_time += time.time() - begin_render
             image_numpy = vpt_test_tensor_cuda.cpu().numpy()
             if args.use_black_bg:
                 image_numpy[3, :, :] = 1.0
@@ -768,6 +772,7 @@ if __name__ == '__main__':
 
     if args.write_performance_info:
         with open(f'{out_dir}/performance.txt', 'w') as f:
-            f.write(f'{end - start}s for {num_frames} - {(end - start) / num_frames} fps')
+            f.write(f'Total time: {end - start}s for {num_frames} - {(end - start) / num_frames}s/frame\n')
+            f.write(f'Render time: {render_time}s for {num_frames} - {render_time / num_frames}s/frame\n')
 
     del vpt_renderer
