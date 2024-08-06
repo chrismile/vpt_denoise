@@ -127,7 +127,7 @@ commands = [
     #],
 ]
 
-for samples in [4, 256]:
+for samples in []:  # [4, 256]
     commands.append([
         'python3', 'src/main.py',
         # 'python3', 'src/render_blender.py',
@@ -167,17 +167,46 @@ for samples in [4, 256]:
         '-o', os.path.join(pathlib.Path.home(), f'datasets/VPT/multiclouds/spp_{samples}_pytorch/incomming_0050')
     ])
 
+#brain_presets = []
+#brain_presets = [1, 2, 3, 4]
+brain_presets = [4]
+if 1 in brain_presets:
+    commands.append([
+        'python3', 'src/main.py', '--img_res', '2048', '--num_frames', '128',
+        '--use_headlight', '-o', os.path.join(pathlib.Path.home(), 'datasets/VPT/brain/preset1')
+    ])
+if 2 in brain_presets:
+    commands.append([
+        'python3', 'src/main.py', '--img_res', '2048', '--num_frames', '128',
+        '-o', os.path.join(pathlib.Path.home(), 'datasets/VPT/brain/preset2')
+    ])
+if 3 in brain_presets:
+    commands.append([
+        'python3', 'src/main.py', '--img_res', '2048', '--num_frames', '128',
+        '--envmap',
+        os.path.join(pathlib.Path.home(), 'Programming/C++/CloudRendering/Data/CloudDataSets/env_maps/constant.exr'),
+        '-o', os.path.join(pathlib.Path.home(), 'datasets/VPT/brain/preset3')
+    ])
+if 4 in brain_presets:
+    commands.append([
+        'python3', 'src/main.py', '--img_res', '2048', '--num_frames', '128',
+        '--render_mode', 'Ray Marching (Emission/Absorption)',
+        '-o', os.path.join(pathlib.Path.home(), 'datasets/VPT/brain/preset4')
+    ])
+
 # The following code is for training 3DGS models; the script train.py is currently not yet publicly released.
 shall_train_3dgs = False
 train_script = os.path.join(pathlib.Path.home(), 'Programming/DL/gaussian_me/train.py')
 train_3dgs = os.path.exists(train_script)
 if shall_train_3dgs and train_3dgs:
-    scenes = ["brain"]
+    #scenes = ["brain_siemens"]
     #presets = [1, 2]
-    #presets = [1]
-    presets = [3]
+    scenes = ["brain"]
+    #presets = [1, 2, 3, 4]
+    presets = [4]
     settings = list(itertools.product(scenes, presets))
     for (scene, preset) in settings:
+        densify_grad_threshold = '0.001' if scene == 'brain_siemens' else '0.0001'
         scene_path = os.path.join(pathlib.Path.home(), "datasets/VPT", scene, f"preset{preset}")
         model_path = os.path.join(pathlib.Path.home(), "datasets/3dgs", f"{scene}_preset{preset}_1")
         commands.append([
@@ -187,7 +216,7 @@ if shall_train_3dgs and train_3dgs:
             '--eval',
             '--test_iterations', '7000', '15000', '30000',
             '--images', 'images',
-            '--densify_grad_threshold', '0.0001',  # '0.0001',
+            '--densify_grad_threshold', densify_grad_threshold,
             '--save_iterations', '7000', '15000', '30000'
         ])
 

@@ -234,6 +234,7 @@ if __name__ == '__main__':
     parser.add_argument('--device_idx', type=int, default=0)
     parser.add_argument('--debug', action='store_true', default=False)
     # Custom settings.
+    parser.add_argument('--render_mode')
     parser.add_argument('--transfer_function')
     parser.add_argument('--transfer_function_grad')
     parser.add_argument('--iso_value', type=float)
@@ -360,6 +361,9 @@ if __name__ == '__main__':
             str(pathlib.Path.home()) + '/Programming/C++/CloudRendering/Data/TransferFunctions/BrainDens.xml')
         vpt_renderer.module().load_transfer_function_file_gradient(
             str(pathlib.Path.home()) + '/Programming/C++/CloudRendering/Data/TransferFunctions/BrainGrad.xml')
+
+    if args.render_mode is not None:
+        mode = args.render_mode
 
     denoiser_name = 'None'
     if mode != 'Ray Marching (Emission/Absorption)':
