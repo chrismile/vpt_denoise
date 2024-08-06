@@ -189,7 +189,7 @@ if 3 in brain_presets:
     ])
 if 4 in brain_presets:
     commands.append([
-        'python3', 'src/main.py', '--img_res', '2048', '--num_frames', '128',
+        'python3', 'src/main.py', '--test_case', 'Brain', '--img_res', '2048', '--num_frames', '128',
         '--render_mode', 'Ray Marching (Emission/Absorption)',
         '-o', os.path.join(pathlib.Path.home(), 'datasets/VPT/brain/preset4')
     ])
