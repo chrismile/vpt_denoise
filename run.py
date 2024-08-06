@@ -172,17 +172,17 @@ for samples in []:  # [4, 256]
 brain_presets = [4]
 if 1 in brain_presets:
     commands.append([
-        'python3', 'src/main.py', '--img_res', '2048', '--num_frames', '128',
+        'python3', 'src/main.py', '--test_case', 'Brain', '--img_res', '2048', '--num_frames', '128',
         '--use_headlight', '-o', os.path.join(pathlib.Path.home(), 'datasets/VPT/brain/preset1')
     ])
 if 2 in brain_presets:
     commands.append([
-        'python3', 'src/main.py', '--img_res', '2048', '--num_frames', '128',
+        'python3', 'src/main.py', '--test_case', 'Brain', '--img_res', '2048', '--num_frames', '128',
         '-o', os.path.join(pathlib.Path.home(), 'datasets/VPT/brain/preset2')
     ])
 if 3 in brain_presets:
     commands.append([
-        'python3', 'src/main.py', '--img_res', '2048', '--num_frames', '128',
+        'python3', 'src/main.py', '--test_case', 'Brain', '--img_res', '2048', '--num_frames', '128',
         '--envmap',
         os.path.join(pathlib.Path.home(), 'Programming/C++/CloudRendering/Data/CloudDataSets/env_maps/constant.exr'),
         '-o', os.path.join(pathlib.Path.home(), 'datasets/VPT/brain/preset3')
