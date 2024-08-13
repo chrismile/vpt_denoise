@@ -209,6 +209,18 @@ def check_camera_is_valid(occupation_volume, aabb, view_matrix, inverse_view_mat
     return True
 
 
+def animate_envmap_0(t):
+    axis = [0.0, 1.0, 0.0]
+    angle = t * 2.0 * np.pi
+    vpt_renderer.module().set_env_map_rot_angle_axis(axis, angle)
+
+
+def animate_envmap_1(t):
+    a = t * 2.0 * np.pi
+    b = t * np.pi * 0.25
+    vpt_renderer.module().set_env_map_rot_euler_angles(a, 0.0, b)
+
+
 if __name__ == '__main__':
     default_envmap = \
         str(pathlib.Path.home()) \
@@ -226,6 +238,7 @@ if __name__ == '__main__':
     parser.add_argument('-o', '--out_dir')
     parser.add_argument('--use_const_seed', action='store_true', default=False)
     parser.add_argument('--envmap', default=default_envmap)
+    parser.add_argument('--animate_envmap', type=int)
     parser.add_argument('--use_headlight', action='store_true', default=False)
     parser.add_argument('--use_black_bg', action='store_true', default=False)
     parser.add_argument('--denoiser')
@@ -685,6 +698,14 @@ if __name__ == '__main__':
             fovy = camera_info['fovy']
             if abs(fovy - vpt_renderer.module().get_camera_fovy()) > 1e-4:
                 vpt_renderer.module().set_camera_fovy(camera_info['fovy'])
+
+        if args.animate_envmap is not None:
+            if args.animate_envmap == 0:
+                animate_envmap_0(i / (num_frames - 1))
+            elif args.animate_envmap == 1:
+                animate_envmap_1(i / (num_frames - 1))
+            else:
+                raise Exception('Error: animate_envmap is out of range')
 
         #torch.cuda.synchronize()
 
