@@ -216,9 +216,12 @@ def animate_envmap_0(t):
 
 
 def animate_envmap_1(t):
+    t_vert_10 = abs(2.0 * t - 1)
+    t_vert_01 = 1 - t_vert_10
     a = t * 2.0 * np.pi
-    b = t * np.pi * 0.25
+    b = t_vert_01 * np.pi * 0.25
     vpt_renderer.module().set_env_map_rot_euler_angles(a, 0.0, b)
+    vpt_renderer.module().set_environment_map_intensity_rgb(1.0, 0.5 + 0.5 * t_vert_10, 0.25 + 0.75 * t_vert_10)
 
 
 if __name__ == '__main__':

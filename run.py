@@ -167,9 +167,23 @@ for samples in []:  # [4, 256]
         '-o', os.path.join(pathlib.Path.home(), f'datasets/VPT/multiclouds/spp_{samples}_pytorch/incomming_0050')
     ])
 
+for samples in [2048]:
+    commands.append([
+        'python3', 'src/main.py',
+        '--use_black_bg',
+        '--write_performance_info', '--envmap',
+        os.path.join(pathlib.Path.home(), 'Programming/C++/CloudRendering/Data/CloudDataSets/env_maps/environment_han.exr'),
+        '--file', os.path.join(pathlib.Path.home(), 'datasets/Han/flow_super_res/incomming_0150_upsampledQ.vdb'),
+        '--num_frames', '128',
+        '--animate_envmap', '1',
+        '--img_res', '1024', '--num_samples', f'{samples}', '--denoiser', 'None',
+        '--scattering_albedo', '0.99', '--extinction_scale', '400.0',
+        '-o', os.path.join(pathlib.Path.home(), f'datasets/VPT/multiclouds_upscaled/spp_{samples}_noisy/incomming_0150')
+    ])
+
 #brain_presets = []
 #brain_presets = [1, 2, 3, 4]
-brain_presets = [4]
+brain_presets = []
 if 1 in brain_presets:
     commands.append([
         'python3', 'src/main.py', '--test_case', 'Brain', '--img_res', '2048', '--num_frames', '128',
@@ -199,23 +213,31 @@ shall_train_3dgs = False
 train_script = os.path.join(pathlib.Path.home(), 'Programming/DL/gaussian_me/train.py')
 train_3dgs = os.path.exists(train_script)
 if shall_train_3dgs and train_3dgs:
-    #scenes = ["brain_siemens"]
-    #presets = [1, 2]
-    scenes = ["brain"]
+    #res = 1
+    scenes = ["brain_siemens"]
+    presets = [1, 2]
+    res = 2
+    #scenes = ["brain"]
     #presets = [1, 2, 3, 4]
-    presets = [4]
+    #presets = [4]
     settings = list(itertools.product(scenes, presets))
     for (scene, preset) in settings:
-        densify_grad_threshold = '0.001' if scene == 'brain_siemens' else '0.0001'
+        densify_grad_threshold = '0.0001'
+        if scene == 'brain_siemens':
+            if res == 1:
+                densify_grad_threshold = '0.001'
+            elif res == 2:
+                densify_grad_threshold = '0.0002'
         scene_path = os.path.join(pathlib.Path.home(), "datasets/VPT", scene, f"preset{preset}")
-        model_path = os.path.join(pathlib.Path.home(), "datasets/3dgs", f"{scene}_preset{preset}_1")
+        model_path = os.path.join(pathlib.Path.home(), "datasets/3dgs", f"{scene}_preset{preset}_{res}")
+        images_folder = 'images' if res == 1 else f'images_{res}'
         commands.append([
             'python3', train_script,
             '-s', scene_path,
             '-m', model_path,
             '--eval',
             '--test_iterations', '7000', '15000', '30000',
-            '--images', 'images',
+            '--images', images_folder,
             '--densify_grad_threshold', densify_grad_threshold,
             '--save_iterations', '7000', '15000', '30000'
         ])
