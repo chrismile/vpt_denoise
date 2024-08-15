@@ -220,8 +220,16 @@ def animate_envmap_1(t):
     t_vert_01 = 1 - t_vert_10
     a = t * 2.0 * np.pi
     b = t_vert_01 * np.pi * 0.25
-    vpt_renderer.module().set_env_map_rot_euler_angles(a, 0.0, b)
+    vpt_renderer.module().set_env_map_rot_euler_angles([a, 0.0, b])
     vpt_renderer.module().set_environment_map_intensity_rgb(1.0, 0.5 + 0.5 * t_vert_10, 0.25 + 0.75 * t_vert_10)
+
+
+def animate_envmap_2(t):
+    t_inv = 1.0 - t
+    a = t * np.pi
+    b = t * np.pi * 0.25
+    vpt_renderer.module().set_env_map_rot_euler_angles([a, 0.0, b])
+    vpt_renderer.module().set_environment_map_intensity_rgb([1.0, 0.5 + 0.5 * t_inv, 0.25 + 0.75 * t_inv])
 
 
 if __name__ == '__main__':
@@ -242,6 +250,7 @@ if __name__ == '__main__':
     parser.add_argument('--use_const_seed', action='store_true', default=False)
     parser.add_argument('--envmap', default=default_envmap)
     parser.add_argument('--animate_envmap', type=int)
+    parser.add_argument('--time', type=float)  # Between 0 and 1; uses constant time for animate_envmap.
     parser.add_argument('--use_headlight', action='store_true', default=False)
     parser.add_argument('--use_black_bg', action='store_true', default=False)
     parser.add_argument('--denoiser')
@@ -703,10 +712,15 @@ if __name__ == '__main__':
                 vpt_renderer.module().set_camera_fovy(camera_info['fovy'])
 
         if args.animate_envmap is not None:
+            t = i / (num_frames - 1)
+            if args.time is not None:
+                t = args.time
             if args.animate_envmap == 0:
-                animate_envmap_0(i / (num_frames - 1))
+                animate_envmap_0(t)
             elif args.animate_envmap == 1:
-                animate_envmap_1(i / (num_frames - 1))
+                animate_envmap_1(t)
+            elif args.animate_envmap == 2:
+                animate_envmap_2(t)
             else:
                 raise Exception('Error: animate_envmap is out of range')
 

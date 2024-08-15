@@ -167,19 +167,22 @@ for samples in []:  # [4, 256]
         '-o', os.path.join(pathlib.Path.home(), f'datasets/VPT/multiclouds/spp_{samples}_pytorch/incomming_0050')
     ])
 
-for samples in [2048]:
-    commands.append([
-        'python3', 'src/main.py',
-        '--use_black_bg',
-        '--write_performance_info', '--envmap',
-        os.path.join(pathlib.Path.home(), 'Programming/C++/CloudRendering/Data/CloudDataSets/env_maps/environment_han.exr'),
-        '--file', os.path.join(pathlib.Path.home(), 'datasets/Han/flow_super_res/incomming_0150_upsampledQ.vdb'),
-        '--num_frames', '128',
-        '--animate_envmap', '1',
-        '--img_res', '1024', '--num_samples', f'{samples}', '--denoiser', 'None',
-        '--scattering_albedo', '0.99', '--extinction_scale', '400.0',
-        '-o', os.path.join(pathlib.Path.home(), f'datasets/VPT/multiclouds_upscaled/spp_{samples}_noisy/incomming_0150')
-    ])
+for samples in [1024]:
+    for time_step in range(100, 200):
+    #for time_step in [100, 149, 199]:
+        t = (time_step - 100) / 99.0
+        commands.append([
+            'python3', 'src/main.py',
+            '--use_black_bg', '--scale_pos', '0.5', '--write_performance_info',
+            '--envmap', os.path.join(pathlib.Path.home(), 'Programming/C++/CloudRendering/Data/CloudDataSets/env_maps/environment_han.exr'),
+            '--file', os.path.join(pathlib.Path.home(), f'datasets/Han/flow_super_res/incomming_{time_step:04d}_upsampledQ.vdb'),
+            '--camposes', os.path.join(pathlib.Path.home(), f'datasets/Han/flow_super_res_cameras/incomming_{time_step:04d}_upsampledQ/images.json'),
+            '--num_frames', '16',
+            '--animate_envmap', '2', '--time', str(t),
+            '--img_res', '1024', '--num_samples', f'{samples}', '--denoiser', 'None',
+            '--scattering_albedo', '0.99', '--extinction_scale', '400.0',
+            '-o', os.path.join(pathlib.Path.home(), f'datasets/VPT/multiclouds_upscaled/timeseries_spp_{samples}_noisy/incomming_{time_step:04d}')
+        ])
 
 #brain_presets = []
 #brain_presets = [1, 2, 3, 4]
