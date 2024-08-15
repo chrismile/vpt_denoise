@@ -405,8 +405,6 @@ if __name__ == '__main__':
 
 
     spp = 256
-    if args.num_samples is not None:
-        spp = args.num_samples
     if mode == 'Delta Tracking':
         spp = 16384
     elif mode == 'Next Event Tracking':
@@ -415,6 +413,8 @@ if __name__ == '__main__':
         spp = 256
     elif mode == 'Ray Marching (Emission/Absorption)':
         spp = 16
+    if args.num_samples is not None:
+        spp = args.num_samples
     vpt_renderer.set_num_frames(spp)
     #if denoiser_name == 'None':
     #    if mode == 'Delta Tracking':
