@@ -238,7 +238,7 @@ def animate_envmap_2(t):
 
 def animate_envmap_3(t):
     vpt_renderer.module().set_env_map_rot_yaw_pitch_roll([-0.709, -1.570, 0.0])
-    vpt_renderer.module().set_environment_map_intensity(3.0)
+    vpt_renderer.module().set_environment_map_intensity(2.0)
 
 
 if __name__ == '__main__':
