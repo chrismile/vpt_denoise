@@ -220,16 +220,25 @@ def animate_envmap_1(t):
     t_vert_01 = 1 - t_vert_10
     a = t * 2.0 * np.pi
     b = t_vert_01 * np.pi * 0.25
-    vpt_renderer.module().set_env_map_rot_euler_angles([a, 0.0, b])
+    vpt_renderer.module().set_env_map_rot_yaw_pitch_roll([a, 0.0, b])
     vpt_renderer.module().set_environment_map_intensity_rgb(1.0, 0.5 + 0.5 * t_vert_10, 0.25 + 0.75 * t_vert_10)
 
 
 def animate_envmap_2(t):
     t_inv = 1.0 - t
+    #yaw_start = 1.5
+    #yaw_end = 0.912
+    #pitch_start = 0.9
+    #pitch_end = 1.6
     a = t * np.pi
     b = t * np.pi * 0.25
     vpt_renderer.module().set_env_map_rot_euler_angles([a, 0.0, b])
     vpt_renderer.module().set_environment_map_intensity_rgb([1.0, 0.5 + 0.5 * t_inv, 0.25 + 0.75 * t_inv])
+
+
+def animate_envmap_3(t):
+    vpt_renderer.module().set_env_map_rot_yaw_pitch_roll([-0.709, -1.570, 0.0])
+    vpt_renderer.module().set_environment_map_intensity(3.0)
 
 
 if __name__ == '__main__':
@@ -721,6 +730,8 @@ if __name__ == '__main__':
                 animate_envmap_1(t)
             elif args.animate_envmap == 2:
                 animate_envmap_2(t)
+            elif args.animate_envmap == 3:
+                animate_envmap_3(t)
             else:
                 raise Exception('Error: animate_envmap is out of range')
 

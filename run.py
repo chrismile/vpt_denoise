@@ -167,20 +167,37 @@ for samples in []:  # [4, 256]
         '-o', os.path.join(pathlib.Path.home(), f'datasets/VPT/multiclouds/spp_{samples}_pytorch/incomming_0050')
     ])
 
-for samples in [1024]:
-    for time_step in range(100, 200):
-    #for time_step in [100, 149, 199]:
-        t = (time_step - 100) / 99.0
+#for samples in [1024]:
+#    for time_step in range(100, 200):
+#    #for time_step in [100, 149, 199]:
+#        t = (time_step - 100) / 99.0
+#        commands.append([
+#            'python3', 'src/main.py',
+#            '--use_black_bg', '--scale_pos', '0.5', '--write_performance_info',
+#            '--envmap', os.path.join(pathlib.Path.home(), 'Programming/C++/CloudRendering/Data/CloudDataSets/env_maps/environment_han.exr'),
+#            '--file', os.path.join(pathlib.Path.home(), f'datasets/Han/flow_super_res/incomming_{time_step:04d}_upsampledQ.vdb'),
+#            '--camposes', os.path.join(pathlib.Path.home(), f'datasets/Han/flow_super_res_cameras/incomming_{time_step:04d}_upsampledQ/images.json'),
+#            '--num_frames', '16',
+#            '--animate_envmap', '2', '--time', str(t),
+#            '--img_res', '1024', '--num_samples', f'{samples}', '--denoiser', 'None',
+#            '--scattering_albedo', '0.99', '--extinction_scale', '400.0',
+#            '-o', os.path.join(pathlib.Path.home(), f'datasets/VPT/multiclouds_upscaled/timeseries_spp_{samples}_noisy/incomming_{time_step:04d}')
+#        ])
+
+for samples in [2048]:
+    #for time_step in range(50, 200):
+    for time_step in [196]:
+        t = (time_step - 50) / 149.0
         commands.append([
             'python3', 'src/main.py',
             '--use_black_bg', '--scale_pos', '0.5', '--write_performance_info',
-            '--envmap', os.path.join(pathlib.Path.home(), 'Programming/C++/CloudRendering/Data/CloudDataSets/env_maps/environment_han.exr'),
+            '--envmap', os.path.join(pathlib.Path.home(), 'Programming/C++/CloudRendering/Data/CloudDataSets/env_maps/belfast_sunset_puresky_4k_2.exr'),
             '--file', os.path.join(pathlib.Path.home(), f'datasets/Han/flow_super_res/incomming_{time_step:04d}_upsampledQ.vdb'),
             '--camposes', os.path.join(pathlib.Path.home(), f'datasets/Han/flow_super_res_cameras/incomming_{time_step:04d}_upsampledQ/images.json'),
-            '--num_frames', '16',
-            '--animate_envmap', '2', '--time', str(t),
+            #'--num_frames', '16',
+            '--animate_envmap', '3', '--time', str(t),
             '--img_res', '1024', '--num_samples', f'{samples}', '--denoiser', 'None',
-            '--scattering_albedo', '0.99', '--extinction_scale', '400.0',
+            '--scattering_albedo', '0.5', '--extinction_scale', '600.0',
             '-o', os.path.join(pathlib.Path.home(), f'datasets/VPT/multiclouds_upscaled/timeseries_spp_{samples}_noisy/incomming_{time_step:04d}')
         ])
 
