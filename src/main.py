@@ -724,7 +724,10 @@ if __name__ == '__main__':
         if args.envmap_rot_camera is not None:
             vpt_renderer.module().set_env_map_rot_camera()
         elif args.animate_envmap is not None:
-            t = i / (num_frames - 1)
+            if num_frames > 1:
+                t = i / (num_frames - 1)
+            else:
+                t = 0.0
             if args.time is not None:
                 t = args.time
             if args.animate_envmap == 0:

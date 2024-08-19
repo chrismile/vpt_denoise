@@ -197,11 +197,26 @@ for samples in [2048]:
             '--animate_envmap', '3', '--time', str(t),
             '--img_res', '1024', '--num_samples', f'{samples}', '--denoiser', 'OpenImageDenoise',
             '--scattering_albedo', '0.5', '--extinction_scale', '600.0',
-            '-o', os.path.join(pathlib.Path.home(), f'datasets/VPT/multiclouds_upscaled/timeseries_spp_{samples}_oidn/incomming_{time_step:04d}')
+            '-o', os.path.join(pathlib.Path.home(), f'datasets/VPT/multiclouds_upscaled/incomming_{time_step:04d}_spp_{samples}_oidn')
         ])
 for samples in [8192]:
     #for time_step in range(50, 200):
     for time_step in [196]:
+        t = (time_step - 50) / 149.0
+        commands.append([
+            'python3', 'src/main.py',
+            '--use_black_bg', '--scale_pos', '0.5', '--write_performance_info',
+            '--envmap', os.path.join(pathlib.Path.home(), 'Programming/C++/CloudRendering/Data/CloudDataSets/env_maps/belfast_sunset_puresky_4k_2.exr'),
+            '--file', os.path.join(pathlib.Path.home(), f'datasets/Han/flow_super_res/incomming_{time_step:04d}_upsampledQ.vdb'),
+            '--camposes', os.path.join(pathlib.Path.home(), f'datasets/Han/flow_super_res_cameras/incomming_{time_step:04d}_upsampledQ/images.json'),
+            '--num_frames', '16',
+            '--animate_envmap', '3', '--time', str(t),
+            '--img_res', '1024', '--num_samples', f'{samples}', '--denoiser', 'OpenImageDenoise',
+            '--scattering_albedo', '0.5', '--extinction_scale', '600.0',
+            '-o', os.path.join(pathlib.Path.home(), f'datasets/VPT/multiclouds_upscaled/incomming_{time_step:04d}_spp_{samples}_noisy')
+        ])
+for samples in [2048]:
+    for time_step in range(50, 200):
         t = (time_step - 50) / 149.0
         commands.append([
             'python3', 'src/main.py',
@@ -256,10 +271,10 @@ shall_train_3dgs = True
 train_script = os.path.join(pathlib.Path.home(), 'Programming/DL/gaussian_me/train.py')
 train_3dgs = os.path.exists(train_script)
 if shall_train_3dgs and train_3dgs:
-    #res = 1
+    #res = 2
     #scenes = ["brain_siemens"]
     #presets = [1, 2]
-    #res = 2
+    res = 1
     scenes = ["brain"]
     #presets = [1, 2, 3, 4]
     presets = [5]
