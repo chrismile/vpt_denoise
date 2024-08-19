@@ -258,6 +258,7 @@ if __name__ == '__main__':
     parser.add_argument('-o', '--out_dir')
     parser.add_argument('--use_const_seed', action='store_true', default=False)
     parser.add_argument('--envmap', default=default_envmap)
+    parser.add_argument('--envmap_rot_camera', action='store_true', default=False)  # Whether to rotate envmap with camera.
     parser.add_argument('--animate_envmap', type=int)
     parser.add_argument('--time', type=float)  # Between 0 and 1; uses constant time for animate_envmap.
     parser.add_argument('--use_headlight', action='store_true', default=False)
@@ -720,7 +721,9 @@ if __name__ == '__main__':
             if abs(fovy - vpt_renderer.module().get_camera_fovy()) > 1e-4:
                 vpt_renderer.module().set_camera_fovy(camera_info['fovy'])
 
-        if args.animate_envmap is not None:
+        if args.envmap_rot_camera is not None:
+            vpt_renderer.module().set_env_map_rot_camera()
+        elif args.animate_envmap is not None:
             t = i / (num_frames - 1)
             if args.time is not None:
                 t = args.time

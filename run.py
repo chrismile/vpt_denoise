@@ -194,16 +194,31 @@ for samples in [2048]:
             '--envmap', os.path.join(pathlib.Path.home(), 'Programming/C++/CloudRendering/Data/CloudDataSets/env_maps/belfast_sunset_puresky_4k_2.exr'),
             '--file', os.path.join(pathlib.Path.home(), f'datasets/Han/flow_super_res/incomming_{time_step:04d}_upsampledQ.vdb'),
             '--camposes', os.path.join(pathlib.Path.home(), f'datasets/Han/flow_super_res_cameras/incomming_{time_step:04d}_upsampledQ/images.json'),
-            #'--num_frames', '16',
             '--animate_envmap', '3', '--time', str(t),
-            '--img_res', '1024', '--num_samples', f'{samples}', '--denoiser', 'None',
+            '--img_res', '1024', '--num_samples', f'{samples}', '--denoiser', 'OpenImageDenoise',
             '--scattering_albedo', '0.5', '--extinction_scale', '600.0',
-            '-o', os.path.join(pathlib.Path.home(), f'datasets/VPT/multiclouds_upscaled/timeseries_spp_{samples}_noisy/incomming_{time_step:04d}')
+            '-o', os.path.join(pathlib.Path.home(), f'datasets/VPT/multiclouds_upscaled/timeseries_spp_{samples}_oidn/incomming_{time_step:04d}')
+        ])
+for samples in [8192]:
+    #for time_step in range(50, 200):
+    for time_step in [196]:
+        t = (time_step - 50) / 149.0
+        commands.append([
+            'python3', 'src/main.py',
+            '--use_black_bg', '--scale_pos', '0.5', '--write_performance_info',
+            '--envmap', os.path.join(pathlib.Path.home(), 'Programming/C++/CloudRendering/Data/CloudDataSets/env_maps/belfast_sunset_puresky_4k_2.exr'),
+            '--file', os.path.join(pathlib.Path.home(), f'datasets/Han/flow_super_res/incomming_{time_step:04d}_upsampledQ.vdb'),
+            '--camposes', os.path.join(pathlib.Path.home(), f'datasets/Han/flow_super_res_cameras/incomming_{time_step:04d}_upsampledQ/images.json'),
+            '--num_frames', '16',
+            '--animate_envmap', '3', '--time', str(t),
+            '--img_res', '1024', '--num_samples', f'{samples}', '--denoiser', 'OpenImageDenoise',
+            '--scattering_albedo', '0.5', '--extinction_scale', '600.0',
+            '-o', os.path.join(pathlib.Path.home(), f'datasets/VPT/multiclouds_upscaled/timeseries_spp_{samples}_oidn/incomming_{time_step:04d}')
         ])
 
 #brain_presets = []
-#brain_presets = [1, 2, 3, 4]
-brain_presets = []
+#brain_presets = [1, 2, 3, 4, 5]
+brain_presets = [5]
 if 1 in brain_presets:
     commands.append([
         'python3', 'src/main.py', '--test_case', 'Brain', '--img_res', '2048', '--num_frames', '128',
@@ -227,19 +242,27 @@ if 4 in brain_presets:
         '--render_mode', 'Ray Marching (Emission/Absorption)',
         '-o', os.path.join(pathlib.Path.home(), 'datasets/VPT/brain/preset4')
     ])
+if 5 in brain_presets:
+    commands.append([
+        'python3', 'src/main.py', '--test_case', 'Brain', '--img_res', '2048', '--num_frames', '128',
+        '--envmap',
+        os.path.join(pathlib.Path.home(), 'Programming/C++/CloudRendering/Data/CloudDataSets/env_maps/op_room.exr'),
+        '--envmap_rot_camera'
+        '-o', os.path.join(pathlib.Path.home(), 'datasets/VPT/brain/preset5')
+    ])
 
 # The following code is for training 3DGS models; the script train.py is currently not yet publicly released.
-shall_train_3dgs = False
+shall_train_3dgs = True
 train_script = os.path.join(pathlib.Path.home(), 'Programming/DL/gaussian_me/train.py')
 train_3dgs = os.path.exists(train_script)
 if shall_train_3dgs and train_3dgs:
     #res = 1
-    scenes = ["brain_siemens"]
-    presets = [1, 2]
-    res = 2
-    #scenes = ["brain"]
+    #scenes = ["brain_siemens"]
+    #presets = [1, 2]
+    #res = 2
+    scenes = ["brain"]
     #presets = [1, 2, 3, 4]
-    #presets = [4]
+    presets = [5]
     settings = list(itertools.product(scenes, presets))
     for (scene, preset) in settings:
         densify_grad_threshold = '0.0001'
