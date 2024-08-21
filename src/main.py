@@ -265,6 +265,7 @@ if __name__ == '__main__':
     parser.add_argument('--use_black_bg', action='store_true', default=False)
     parser.add_argument('--denoiser')
     parser.add_argument('--pytorch_denoiser_model_file')  # Only if denoiser name starts with 'PyTorch'
+    parser.add_argument('--denoiser_settings', metavar="KEY=VALUE", nargs='+')
     parser.add_argument('--write_performance_info', action='store_true', default=False)
     parser.add_argument('--device_idx', type=int, default=0)
     parser.add_argument('--debug', action='store_true', default=False)
@@ -412,6 +413,14 @@ if __name__ == '__main__':
         vpt_renderer.module().set_denoiser(denoiser_name)
     if denoiser_name.startswith('PyTorch') and args.pytorch_denoiser_model_file is not None:
         vpt_renderer.module().set_pytorch_denoiser_model_file(args.pytorch_denoiser_model_file)
+
+    if args.denoiser_settings is not None:
+        for item in args.denoiser_settings:
+            items = item.split('=')
+            key = items[0].strip()
+            if len(items) > 1:
+                value = ','.join(items[1:])
+                vpt_renderer.module().set_denoiser_property(key, value)
 
 
     spp = 256
@@ -721,7 +730,7 @@ if __name__ == '__main__':
             if abs(fovy - vpt_renderer.module().get_camera_fovy()) > 1e-4:
                 vpt_renderer.module().set_camera_fovy(camera_info['fovy'])
 
-        if args.envmap_rot_camera is not None:
+        if args.envmap_rot_camera is not None and args.envmap_rot_camera:
             vpt_renderer.module().set_env_map_rot_camera()
         elif args.animate_envmap is not None:
             if num_frames > 1:

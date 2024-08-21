@@ -184,22 +184,45 @@ for samples in []:  # [4, 256]
 #            '-o', os.path.join(pathlib.Path.home(), f'datasets/VPT/multiclouds_upscaled/timeseries_spp_{samples}_noisy/incomming_{time_step:04d}')
 #        ])
 
-for samples in [2048]:
+for samples in [4, 256, 2048]:  # 8192
     #for time_step in range(50, 200):
     for time_step in [196]:
         t = (time_step - 50) / 149.0
-        commands.append([
-            'python3', 'src/main.py',
-            '--use_black_bg', '--scale_pos', '0.5', '--write_performance_info',
-            '--envmap', os.path.join(pathlib.Path.home(), 'Programming/C++/CloudRendering/Data/CloudDataSets/env_maps/belfast_sunset_puresky_4k_2.exr'),
-            '--file', os.path.join(pathlib.Path.home(), f'datasets/Han/flow_super_res/incomming_{time_step:04d}_upsampledQ.vdb'),
-            '--camposes', os.path.join(pathlib.Path.home(), f'datasets/Han/flow_super_res_cameras/incomming_{time_step:04d}_upsampledQ/images.json'),
-            '--animate_envmap', '3', '--time', str(t),
-            '--img_res', '1024', '--num_samples', f'{samples}', '--denoiser', 'OpenImageDenoise',
-            '--scattering_albedo', '0.5', '--extinction_scale', '600.0',
-            '-o', os.path.join(pathlib.Path.home(), f'datasets/VPT/multiclouds_upscaled/incomming_{time_step:04d}_spp_{samples}_oidn')
-        ])
-for samples in [8192]:
+        for denoiser in ['None', 'OptiX', 'OpenImageDenoise', 'PyTorch Denoiser Module']:
+            command = []
+            command += [
+                'python3', 'src/main.py',
+                '--use_black_bg', '--scale_pos', '0.5', '--write_performance_info',
+                '--envmap', os.path.join(pathlib.Path.home(), 'Programming/C++/CloudRendering/Data/CloudDataSets/env_maps/belfast_sunset_puresky_4k_2.exr'),
+                '--file', os.path.join(pathlib.Path.home(), f'datasets/Han/flow_super_res/incomming_{time_step:04d}_upsampledQ.vdb'),
+                '--camposes', os.path.join(pathlib.Path.home(), f'datasets/Han/flow_super_res_cameras/incomming_{time_step:04d}_upsampledQ/images.json'),
+                '--animate_envmap', '3', '--time', str(t),
+                '--img_res', '1024', '--num_samples', f'{samples}', '--denoiser', denoiser,
+                '--scattering_albedo', '0.5', '--extinction_scale', '600.0',
+            ]
+            if denoiser == 'PyTorch Denoiser Module':
+                command += ['--pytorch_denoiser_model_file', os.path.join(pathlib.Path.home(), 'Programming/C++/CloudRendering/Data/PyTorch/timm/network_main.pt')]
+            if denoiser == 'OptiX' or denoiser == 'OpenImageDenoise':
+                command_with_feature_maps = command.copy()
+                command_with_feature_maps += ['--denoiser_settings', 'use_albedo=1', 'use_normal_map=1']
+                if denoiser == 'OptiX':
+                    mode_name = 'optix_normals'
+                elif denoiser == 'OpenImageDenoise':
+                    mode_name = 'oidn_normals'
+                command_with_feature_maps += ['-o', os.path.join(pathlib.Path.home(), f'datasets/VPT/multiclouds_upscaled/incomming_{time_step:04d}_spp_{samples}_{mode_name}')]
+                commands.append(command_with_feature_maps)
+            if denoiser == 'None':
+                mode_name = 'noisy'
+            elif denoiser == 'OptiX':
+                mode_name = 'optix'
+            elif denoiser == 'OpenImageDenoise':
+                mode_name = 'oidn'
+            elif denoiser == 'PyTorch Denoiser Module':
+                mode_name = 'pytorch'
+            command += ['-o', os.path.join(pathlib.Path.home(), f'datasets/VPT/multiclouds_upscaled/incomming_{time_step:04d}_spp_{samples}_{mode_name}')]
+            commands.append(command)
+# Test: Only some images with 8192 samples
+for samples in []:  # 8192
     #for time_step in range(50, 200):
     for time_step in [196]:
         t = (time_step - 50) / 149.0
@@ -211,11 +234,12 @@ for samples in [8192]:
             '--camposes', os.path.join(pathlib.Path.home(), f'datasets/Han/flow_super_res_cameras/incomming_{time_step:04d}_upsampledQ/images.json'),
             '--num_frames', '16',
             '--animate_envmap', '3', '--time', str(t),
-            '--img_res', '1024', '--num_samples', f'{samples}', '--denoiser', 'OpenImageDenoise',
+            '--img_res', '1024', '--num_samples', f'{samples}', '--denoiser', 'None',
             '--scattering_albedo', '0.5', '--extinction_scale', '600.0',
             '-o', os.path.join(pathlib.Path.home(), f'datasets/VPT/multiclouds_upscaled/incomming_{time_step:04d}_spp_{samples}_noisy')
         ])
-for samples in [2048]:
+# Generate time series
+for samples in []:
     for time_step in range(50, 200):
         t = (time_step - 50) / 149.0
         commands.append([
@@ -226,14 +250,14 @@ for samples in [2048]:
             '--camposes', os.path.join(pathlib.Path.home(), f'datasets/Han/flow_super_res_cameras/incomming_{time_step:04d}_upsampledQ/images.json'),
             '--num_frames', '16',
             '--animate_envmap', '3', '--time', str(t),
-            '--img_res', '1024', '--num_samples', f'{samples}', '--denoiser', 'OpenImageDenoise',
+            '--img_res', '1024', '--num_samples', f'{samples}', '--denoiser', 'None',
             '--scattering_albedo', '0.5', '--extinction_scale', '600.0',
-            '-o', os.path.join(pathlib.Path.home(), f'datasets/VPT/multiclouds_upscaled/timeseries_spp_{samples}_oidn/incomming_{time_step:04d}')
+            '-o', os.path.join(pathlib.Path.home(), f'datasets/VPT/multiclouds_upscaled/timeseries_spp_{samples}_noisy/incomming_{time_step:04d}')
         ])
 
 #brain_presets = []
 #brain_presets = [1, 2, 3, 4, 5]
-brain_presets = [5]
+brain_presets = []
 if 1 in brain_presets:
     commands.append([
         'python3', 'src/main.py', '--test_case', 'Brain', '--img_res', '2048', '--num_frames', '128',
@@ -262,7 +286,7 @@ if 5 in brain_presets:
         'python3', 'src/main.py', '--test_case', 'Brain', '--img_res', '2048', '--num_frames', '128',
         '--envmap',
         os.path.join(pathlib.Path.home(), 'Programming/C++/CloudRendering/Data/CloudDataSets/env_maps/op_room.exr'),
-        '--envmap_rot_camera'
+        '--envmap_rot_camera',
         '-o', os.path.join(pathlib.Path.home(), 'datasets/VPT/brain/preset5')
     ])
 
@@ -276,8 +300,8 @@ if shall_train_3dgs and train_3dgs:
     #presets = [1, 2]
     res = 1
     scenes = ["brain"]
-    #presets = [1, 2, 3, 4]
-    presets = [5]
+    #presets = [1, 2, 3, 4, 5]
+    presets = []
     settings = list(itertools.product(scenes, presets))
     for (scene, preset) in settings:
         densify_grad_threshold = '0.0001'
@@ -285,6 +309,9 @@ if shall_train_3dgs and train_3dgs:
             if res == 1:
                 densify_grad_threshold = '0.001'
             elif res == 2:
+                densify_grad_threshold = '0.0002'
+        if scene == 'brain':
+            if preset == 5:
                 densify_grad_threshold = '0.0002'
         scene_path = os.path.join(pathlib.Path.home(), "datasets/VPT", scene, f"preset{preset}")
         model_path = os.path.join(pathlib.Path.home(), "datasets/3dgs", f"{scene}_preset{preset}_{res}")
