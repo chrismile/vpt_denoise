@@ -261,6 +261,7 @@ if __name__ == '__main__':
     parser.add_argument('--envmap_rot_camera', action='store_true', default=False)  # Whether to rotate envmap with camera.
     parser.add_argument('--animate_envmap', type=int)
     parser.add_argument('--time', type=float)  # Between 0 and 1; uses constant time for animate_envmap.
+    parser.add_argument('--global_bbox', type=float, nargs='+')  # Between 0 and 1; uses constant time for animate_envmap.
     parser.add_argument('--use_headlight', action='store_true', default=False)
     parser.add_argument('--use_black_bg', action='store_true', default=False)
     parser.add_argument('--denoiser')
@@ -325,6 +326,9 @@ if __name__ == '__main__':
     #print(test_tensor_vulkan)
     vpt_renderer = VolumetricPathTracingRenderer()
     render_module = vpt_renderer.module()
+
+    if args.global_bbox is not None:
+        vpt_renderer.module().set_global_world_bounding_box(args.global_bbox)
 
     gaussian_splatting_data = True
     if args.out_dir is None:

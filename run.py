@@ -246,6 +246,7 @@ for samples in [2048]:
         commands.append([
             'python3', 'src/main.py',
             '--use_black_bg', '--scale_pos', '0.5', '--write_performance_info',
+            '--global_bbox', '60.0', '965.0', '156.0', '889.0', '24.0', '349.0',
             '--envmap', os.path.join(pathlib.Path.home(), 'Programming/C++/CloudRendering/Data/CloudDataSets/env_maps/belfast_sunset_puresky_4k_2.exr'),
             '--file', os.path.join(pathlib.Path.home(), f'datasets/Han/flow_super_res/incomming_{time_step:04d}_upsampledQ.vdb'),
             '--camposes', os.path.join(pathlib.Path.home(), f'datasets/Han/flow_super_res_cameras/incomming_{time_step:04d}_upsampledQ/images.json'),
