@@ -184,11 +184,13 @@ for samples in []:  # [4, 256]
 #            '-o', os.path.join(pathlib.Path.home(), f'datasets/VPT/multiclouds_upscaled/timeseries_spp_{samples}_noisy/incomming_{time_step:04d}')
 #        ])
 
-for samples in [4, 256, 2048]:  # 8192
+#for samples in [4, 256, 2048]:  # 8192
+for samples in []:
     #for time_step in range(50, 200):
     for time_step in [196]:
         t = (time_step - 50) / 149.0
-        for denoiser in ['None', 'OptiX', 'OpenImageDenoise', 'PyTorch Denoiser Module']:
+        #for denoiser in ['None', 'OptiX Denoiser', 'OpenImageDenoise', 'PyTorch Denoiser Module']:
+        for denoiser in ['OptiX Denoiser']:
             command = []
             command += [
                 'python3', 'src/main.py',
@@ -202,10 +204,10 @@ for samples in [4, 256, 2048]:  # 8192
             ]
             if denoiser == 'PyTorch Denoiser Module':
                 command += ['--pytorch_denoiser_model_file', os.path.join(pathlib.Path.home(), 'Programming/C++/CloudRendering/Data/PyTorch/timm/network_main.pt')]
-            if denoiser == 'OptiX' or denoiser == 'OpenImageDenoise':
+            if denoiser == 'OptiX Denoiser' or denoiser == 'OpenImageDenoise':
                 command_with_feature_maps = command.copy()
                 command_with_feature_maps += ['--denoiser_settings', 'use_albedo=1', 'use_normal_map=1']
-                if denoiser == 'OptiX':
+                if denoiser == 'OptiX Denoiser':
                     mode_name = 'optix_normals'
                 elif denoiser == 'OpenImageDenoise':
                     mode_name = 'oidn_normals'
@@ -213,7 +215,7 @@ for samples in [4, 256, 2048]:  # 8192
                 commands.append(command_with_feature_maps)
             if denoiser == 'None':
                 mode_name = 'noisy'
-            elif denoiser == 'OptiX':
+            elif denoiser == 'OptiX Denoiser':
                 mode_name = 'optix'
             elif denoiser == 'OpenImageDenoise':
                 mode_name = 'oidn'
@@ -232,14 +234,13 @@ for samples in []:  # 8192
             '--envmap', os.path.join(pathlib.Path.home(), 'Programming/C++/CloudRendering/Data/CloudDataSets/env_maps/belfast_sunset_puresky_4k_2.exr'),
             '--file', os.path.join(pathlib.Path.home(), f'datasets/Han/flow_super_res/incomming_{time_step:04d}_upsampledQ.vdb'),
             '--camposes', os.path.join(pathlib.Path.home(), f'datasets/Han/flow_super_res_cameras/incomming_{time_step:04d}_upsampledQ/images.json'),
-            '--num_frames', '16',
             '--animate_envmap', '3', '--time', str(t),
             '--img_res', '1024', '--num_samples', f'{samples}', '--denoiser', 'None',
             '--scattering_albedo', '0.5', '--extinction_scale', '600.0',
             '-o', os.path.join(pathlib.Path.home(), f'datasets/VPT/multiclouds_upscaled/incomming_{time_step:04d}_spp_{samples}_noisy')
         ])
 # Generate time series
-for samples in []:
+for samples in [2048]:
     for time_step in range(50, 200):
         t = (time_step - 50) / 149.0
         commands.append([
@@ -248,11 +249,12 @@ for samples in []:
             '--envmap', os.path.join(pathlib.Path.home(), 'Programming/C++/CloudRendering/Data/CloudDataSets/env_maps/belfast_sunset_puresky_4k_2.exr'),
             '--file', os.path.join(pathlib.Path.home(), f'datasets/Han/flow_super_res/incomming_{time_step:04d}_upsampledQ.vdb'),
             '--camposes', os.path.join(pathlib.Path.home(), f'datasets/Han/flow_super_res_cameras/incomming_{time_step:04d}_upsampledQ/images.json'),
-            '--num_frames', '16',
             '--animate_envmap', '3', '--time', str(t),
-            '--img_res', '1024', '--num_samples', f'{samples}', '--denoiser', 'None',
+            '--img_res', '1024', '--num_samples', f'{samples}', '--denoiser', 'PyTorch Denoiser Module',
+            '--pytorch_denoiser_model_file',
+            os.path.join(pathlib.Path.home(), 'Programming/C++/CloudRendering/Data/PyTorch/timm/network_main.pt'),
             '--scattering_albedo', '0.5', '--extinction_scale', '600.0',
-            '-o', os.path.join(pathlib.Path.home(), f'datasets/VPT/multiclouds_upscaled/timeseries_spp_{samples}_noisy/incomming_{time_step:04d}')
+            '-o', os.path.join(pathlib.Path.home(), f'datasets/VPT/multiclouds_upscaled/timeseries_spp_{samples}_pytorch/incomming_{time_step:04d}')
         ])
 
 #brain_presets = []
@@ -289,6 +291,15 @@ if 5 in brain_presets:
         '--envmap_rot_camera',
         '-o', os.path.join(pathlib.Path.home(), 'datasets/VPT/brain/preset5')
     ])
+if 6 in brain_presets:
+    commands.append([
+        'python3', 'src/main.py', '--test_case', 'Brain', '--img_res', '2048', '--num_frames', '128',
+        '--denoiser', 'OpenImageDenoise',
+        '--envmap',
+        os.path.join(pathlib.Path.home(), 'Programming/C++/CloudRendering/Data/CloudDataSets/env_maps/op_room2.exr'),
+        '--envmap_rot_camera',
+        '-o', os.path.join(pathlib.Path.home(), 'datasets/VPT/brain/preset6')
+    ])
 
 # The following code is for training 3DGS models; the script train.py is currently not yet publicly released.
 shall_train_3dgs = True
@@ -300,7 +311,7 @@ if shall_train_3dgs and train_3dgs:
     #presets = [1, 2]
     res = 1
     scenes = ["brain"]
-    #presets = [1, 2, 3, 4, 5]
+    #presets = [1, 2, 3, 4, 5, 6]
     presets = []
     settings = list(itertools.product(scenes, presets))
     for (scene, preset) in settings:
@@ -311,7 +322,7 @@ if shall_train_3dgs and train_3dgs:
             elif res == 2:
                 densify_grad_threshold = '0.0002'
         if scene == 'brain':
-            if preset == 5:
+            if preset == 5 or preset == 6:
                 densify_grad_threshold = '0.0002'
         scene_path = os.path.join(pathlib.Path.home(), "datasets/VPT", scene, f"preset{preset}")
         model_path = os.path.join(pathlib.Path.home(), "datasets/3dgs", f"{scene}_preset{preset}_{res}")
