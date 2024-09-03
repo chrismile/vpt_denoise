@@ -258,11 +258,13 @@ if __name__ == '__main__':
     parser.add_argument('-o', '--out_dir')
     parser.add_argument('--use_const_seed', action='store_true', default=False)
     parser.add_argument('--envmap', default=default_envmap)
+    parser.add_argument('--envmap_intensity', type=float)
     parser.add_argument('--envmap_rot_camera', action='store_true', default=False)  # Whether to rotate envmap with camera.
     parser.add_argument('--animate_envmap', type=int)
     parser.add_argument('--time', type=float)  # Between 0 and 1; uses constant time for animate_envmap.
     parser.add_argument('--global_bbox', type=float, nargs='+')  # Between 0 and 1; uses constant time for animate_envmap.
     parser.add_argument('--use_headlight', action='store_true', default=False)
+    parser.add_argument('--use_lights', action='store_true', default=False)
     parser.add_argument('--use_black_bg', action='store_true', default=False)
     parser.add_argument('--denoiser')
     parser.add_argument('--pytorch_denoiser_model_file')  # Only if denoiser name starts with 'PyTorch'
@@ -374,7 +376,10 @@ if __name__ == '__main__':
         vpt_renderer.module().load_volume_file(
             str(pathlib.Path.home()) + '/datasets/Siemens/brain_cleaned/23.42um_4_cleaned.dat')
     vpt_renderer.module().load_environment_map(args.envmap)
+    if args.envmap_intensity is not None:
+        vpt_renderer.module().load_environment_map(args.envmap_intensity)
     vpt_renderer.module().set_use_transfer_function(True)
+    vpt_renderer.module().set_use_lights(args.use_lights)
 
     #mode = 'Delta Tracking'
     mode = 'Next Event Tracking'
