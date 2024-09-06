@@ -265,6 +265,7 @@ if __name__ == '__main__':
     parser.add_argument('--global_bbox', type=float, nargs='+')  # Between 0 and 1; uses constant time for animate_envmap.
     parser.add_argument('--use_headlight', action='store_true', default=False)
     parser.add_argument('--use_lights', action='store_true', default=False)
+    parser.add_argument('--use_lights_from')
     parser.add_argument('--use_black_bg', action='store_true', default=False)
     parser.add_argument('--denoiser')
     parser.add_argument('--pytorch_denoiser_model_file')  # Only if denoiser name starts with 'PyTorch'
@@ -275,7 +276,13 @@ if __name__ == '__main__':
     # Custom settings.
     parser.add_argument('--render_mode')
     parser.add_argument('--transfer_function')
+    parser.add_argument('--transfer_function_range_min', default=0.0)
+    parser.add_argument('--transfer_function_range_max')
     parser.add_argument('--transfer_function_grad')
+    parser.add_argument('--transfer_function_grad_range_min')
+    parser.add_argument('--transfer_function_grad_range_max')
+    parser.add_argument('--brdf')
+    parser.add_argument('--brdf_parameters', metavar="KEY=VALUE", nargs='+')
     parser.add_argument('--iso_value', type=float)
     parser.add_argument('--scattering_albedo', type=float, default=0.99)
     parser.add_argument('--extinction_scale', type=float, default=400.0)
@@ -377,9 +384,12 @@ if __name__ == '__main__':
             str(pathlib.Path.home()) + '/datasets/Siemens/brain_cleaned/23.42um_4_cleaned.dat')
     vpt_renderer.module().load_environment_map(args.envmap)
     if args.envmap_intensity is not None:
-        vpt_renderer.module().load_environment_map(args.envmap_intensity)
+        vpt_renderer.module().set_environment_map_intensity(args.envmap_intensity)
     vpt_renderer.module().set_use_transfer_function(True)
     vpt_renderer.module().set_use_lights(args.use_lights)
+    if args.use_lights_from is not None:
+        vpt_renderer.module().set_use_lights(True)
+        vpt_renderer.module().load_lights_from_file(args.use_lights_from)
 
     #mode = 'Delta Tracking'
     mode = 'Next Event Tracking'
@@ -459,21 +469,9 @@ if __name__ == '__main__':
     iso_value = 0.0
     if test_case == 'Custom':
         vpt_renderer.module().set_use_transfer_function(args.transfer_function is not None)
-        if args.transfer_function is not None:
-            vpt_renderer.module().load_transfer_function_file(args.transfer_function)
-            if args.transfer_function_grad is not None:
-                vpt_renderer.module().load_transfer_function_file_gradient(args.transfer_function)
         vpt_renderer.module().set_use_isosurfaces(args.iso_value is not None)
-        if args.iso_value is not None:
-            iso_value = args.iso_value
         vpt_renderer.module().set_scattering_albedo([args.scattering_albedo, args.scattering_albedo, args.scattering_albedo])
         vpt_renderer.module().set_extinction_scale(args.extinction_scale)
-        # TODO
-        #if args.use_headlight:
-        #    vpt_renderer.module().set_use_headlight(True)
-        #    vpt_renderer.module().set_use_builtin_environment_map('Black')
-        #    vpt_renderer.module().set_use_headlight_distance(False)
-        #    vpt_renderer.module().set_headlight_intensity(6.0)
     elif test_case == 'Wholebody':
         vpt_renderer.module().set_use_isosurfaces(True)
         use_gradient_mode = False
@@ -518,9 +516,39 @@ if __name__ == '__main__':
             vpt_renderer.module().set_use_headlight_distance(False)
             vpt_renderer.module().set_headlight_intensity(6.0)
 
+    if args.transfer_function is not None:
+        vpt_renderer.module().set_use_transfer_function(True)
+        vpt_renderer.module().load_transfer_function_file(args.transfer_function)
+        if args.transfer_function_range_min is not None and args.transfer_function_range_max is not None:
+            vpt_renderer.module().set_transfer_function_range(args.transfer_function_range_min, args.transfer_function_range_max)
+        if args.transfer_function_grad is not None:
+            vpt_renderer.module().load_transfer_function_file_gradient(args.transfer_function_grad)
+            if args.transfer_function_grad_range_min is not None and args.transfer_function_grad_range_max is not None:
+                vpt_renderer.module().set_transfer_function_range_gradient(args.transfer_function_grad_range_min, args.transfer_function_grad_range_max)
+
+    if args.iso_value is not None:
+        vpt_renderer.module().set_use_isosurfaces(True)
+        if args.iso_value is not None:
+            iso_value = args.iso_value
+        # TODO
+        #if args.use_headlight:
+        #    vpt_renderer.module().set_use_headlight(True)
+        #    vpt_renderer.module().set_use_builtin_environment_map('Black')
+        #    vpt_renderer.module().set_use_headlight_distance(False)
+        #    vpt_renderer.module().set_headlight_intensity(6.0)
+
     vpt_renderer.module().set_iso_surface_color([0.4, 0.4, 0.4])
     vpt_renderer.module().set_surface_brdf('Lambertian')
-    #vpt_renderer.module().set_surface_brdf('Blinn Phong')
+    if args.brdf is not None:
+        vpt_renderer.module().set_surface_brdf(args.brdf)
+    if args.brdf_parameters is not None:
+        for item in args.brdf_parameters:
+            items = item.split('=')
+            key = items[0].strip()
+            if len(items) > 1:
+                value = ','.join(items[1:])
+                vpt_renderer.module().set_brdf_parameter(key, value)
+
     used_feature_maps = ['Cloud Only', 'Background', 'Depth Blended']
     vpt_renderer.module().set_use_feature_maps(used_feature_maps)
     vpt_renderer.module().set_output_foreground_map(True)

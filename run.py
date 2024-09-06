@@ -240,7 +240,7 @@ for samples in []:  # 8192
             '-o', os.path.join(pathlib.Path.home(), f'datasets/VPT/multiclouds_upscaled/incomming_{time_step:04d}_spp_{samples}_noisy')
         ])
 # Generate time series
-for samples in [2048]:
+for samples in []:  # 1024
     for time_step in range(50, 200):
         t = (time_step - 50) / 149.0
         commands.append([
@@ -259,8 +259,8 @@ for samples in [2048]:
         ])
 
 #brain_presets = []
-#brain_presets = [1, 2, 3, 4, 5]
-brain_presets = []
+#brain_presets = [1, 2, 3, 4, 5, 6, 7]
+brain_presets = [8, 9]
 if 1 in brain_presets:
     commands.append([
         'python3', 'src/main.py', '--test_case', 'Brain', '--img_res', '2048', '--num_frames', '128',
@@ -301,6 +301,39 @@ if 6 in brain_presets:
         '--envmap_rot_camera',
         '-o', os.path.join(pathlib.Path.home(), 'datasets/VPT/brain/preset6')
     ])
+if 7 in brain_presets:
+    commands.append([
+        'python3', 'src/main.py', '--test_case', 'Brain', '--img_res', '2048', '--num_frames', '128',
+        '--denoiser', 'OpenImageDenoise',
+        '--envmap', os.path.join(pathlib.Path.home(), 'Programming/C++/CloudRendering/Data/CloudDataSets/env_maps/op_room2.exr'),
+        '--envmap_intensity', '0.0',
+        '--transfer_function_grad', str(pathlib.Path.home()) + '/Programming/C++/CloudRendering/Data/TransferFunctions/BrainGrad2.xml',
+        '--transfer_function_grad_range_min', '0.0', '--transfer_function_grad_range_max', '0.08',
+        '--use_lights_from', os.path.join(pathlib.Path.home(), 'Programming/C++/CloudRendering/Data/CloudDataSets/Lights/LightsOpRoom01.json'),
+        '--brdf', 'Cook Torrance', '--brdf_parameters', 'metallic=0.0', 'specular=0.74', 'specular=0.41',
+        '-o', os.path.join(pathlib.Path.home(), 'datasets/VPT/brain/preset7')
+    ])
+if 8 in brain_presets:
+    commands.append([
+        'python3', 'src/main.py', '--test_case', 'Brain', '--img_res', '2048', '--num_frames', '128',
+        '--denoiser', 'OpenImageDenoise',
+        '--envmap',
+        os.path.join(pathlib.Path.home(), 'Programming/C++/CloudRendering/Data/CloudDataSets/env_maps/op_room2.exr'),
+        '--transfer_function_grad', str(pathlib.Path.home()) + '/Programming/C++/CloudRendering/Data/TransferFunctions/BrainGrad2.xml',
+        '--transfer_function_grad_range_min', '0.0', '--transfer_function_grad_range_max', '0.08',
+        '--brdf', 'Cook Torrance', '--brdf_parameters', 'metallic=0.0', 'specular=0.74', 'specular=0.41',
+        '-o', os.path.join(pathlib.Path.home(), 'datasets/VPT/brain/preset8')
+    ])
+if 9 in brain_presets:
+    commands.append([
+        'python3', 'src/main.py', '--test_case', 'Brain', '--img_res', '2048', '--num_frames', '128',
+        '--denoiser', 'OpenImageDenoise',
+        '--envmap',
+        os.path.join(pathlib.Path.home(), 'Programming/C++/CloudRendering/Data/CloudDataSets/env_maps/op_room2.exr'),
+        '--transfer_function_grad', str(pathlib.Path.home()) + '/Programming/C++/CloudRendering/Data/TransferFunctions/BrainGrad2.xml',
+        '--transfer_function_grad_range_min', '0.0', '--transfer_function_grad_range_max', '0.08',
+        '-o', os.path.join(pathlib.Path.home(), 'datasets/VPT/brain/preset9')
+    ])
 
 # The following code is for training 3DGS models; the script train.py is currently not yet publicly released.
 shall_train_3dgs = True
@@ -312,8 +345,8 @@ if shall_train_3dgs and train_3dgs:
     #presets = [1, 2]
     res = 1
     scenes = ["brain"]
-    #presets = [1, 2, 3, 4, 5, 6]
-    presets = []
+    #presets = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+    presets = [8, 9]
     settings = list(itertools.product(scenes, presets))
     for (scene, preset) in settings:
         densify_grad_threshold = '0.0001'
