@@ -260,7 +260,7 @@ for samples in []:  # 1024
 
 #brain_presets = []
 #brain_presets = [1, 2, 3, 4, 5, 6, 7]
-brain_presets = [8, 9]
+brain_presets = [7, 8, 9]
 if 1 in brain_presets:
     commands.append([
         'python3', 'src/main.py', '--test_case', 'Brain', '--img_res', '2048', '--num_frames', '128',
@@ -309,8 +309,8 @@ if 7 in brain_presets:
         '--envmap_intensity', '0.0',
         '--transfer_function_grad', str(pathlib.Path.home()) + '/Programming/C++/CloudRendering/Data/TransferFunctions/BrainGrad2.xml',
         '--transfer_function_grad_range_min', '0.0', '--transfer_function_grad_range_max', '0.08',
-        '--use_lights_from', os.path.join(pathlib.Path.home(), 'Programming/C++/CloudRendering/Data/CloudDataSets/Lights/LightsOpRoom01.json'),
-        '--brdf', 'Cook Torrance', '--brdf_parameters', 'metallic=0.0', 'specular=0.74', 'specular=0.41',
+        '--use_lights_from', os.path.join(pathlib.Path.home(), 'Programming/C++/CloudRendering/Data/Lights/LightsOpRoom01.json'),
+        '--brdf', 'Cook Torrance', '--brdf_parameters', 'metallic=0.0', 'specular=0.8', 'roughness=0.3',
         '-o', os.path.join(pathlib.Path.home(), 'datasets/VPT/brain/preset7')
     ])
 if 8 in brain_presets:
@@ -321,7 +321,7 @@ if 8 in brain_presets:
         os.path.join(pathlib.Path.home(), 'Programming/C++/CloudRendering/Data/CloudDataSets/env_maps/op_room2.exr'),
         '--transfer_function_grad', str(pathlib.Path.home()) + '/Programming/C++/CloudRendering/Data/TransferFunctions/BrainGrad2.xml',
         '--transfer_function_grad_range_min', '0.0', '--transfer_function_grad_range_max', '0.08',
-        '--brdf', 'Cook Torrance', '--brdf_parameters', 'metallic=0.0', 'specular=0.74', 'specular=0.41',
+        '--brdf', 'Cook Torrance', '--brdf_parameters', 'metallic=0.0', 'specular=0.8', 'roughness=0.3',
         '-o', os.path.join(pathlib.Path.home(), 'datasets/VPT/brain/preset8')
     ])
 if 9 in brain_presets:
@@ -346,7 +346,7 @@ if shall_train_3dgs and train_3dgs:
     res = 1
     scenes = ["brain"]
     #presets = [1, 2, 3, 4, 5, 6, 7, 8, 9]
-    presets = [8, 9]
+    presets = [7, 8, 9]
     settings = list(itertools.product(scenes, presets))
     for (scene, preset) in settings:
         densify_grad_threshold = '0.0001'

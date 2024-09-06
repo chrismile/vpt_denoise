@@ -276,11 +276,11 @@ if __name__ == '__main__':
     # Custom settings.
     parser.add_argument('--render_mode')
     parser.add_argument('--transfer_function')
-    parser.add_argument('--transfer_function_range_min', default=0.0)
-    parser.add_argument('--transfer_function_range_max')
+    parser.add_argument('--transfer_function_range_min', type=float, default=0.0)
+    parser.add_argument('--transfer_function_range_max', type=float)
     parser.add_argument('--transfer_function_grad')
-    parser.add_argument('--transfer_function_grad_range_min')
-    parser.add_argument('--transfer_function_grad_range_max')
+    parser.add_argument('--transfer_function_grad_range_min', type=float, default=0.0)
+    parser.add_argument('--transfer_function_grad_range_max', type=float)
     parser.add_argument('--brdf')
     parser.add_argument('--brdf_parameters', metavar="KEY=VALUE", nargs='+')
     parser.add_argument('--iso_value', type=float)
@@ -521,10 +521,10 @@ if __name__ == '__main__':
         vpt_renderer.module().load_transfer_function_file(args.transfer_function)
         if args.transfer_function_range_min is not None and args.transfer_function_range_max is not None:
             vpt_renderer.module().set_transfer_function_range(args.transfer_function_range_min, args.transfer_function_range_max)
-        if args.transfer_function_grad is not None:
-            vpt_renderer.module().load_transfer_function_file_gradient(args.transfer_function_grad)
-            if args.transfer_function_grad_range_min is not None and args.transfer_function_grad_range_max is not None:
-                vpt_renderer.module().set_transfer_function_range_gradient(args.transfer_function_grad_range_min, args.transfer_function_grad_range_max)
+    if args.transfer_function_grad is not None:
+        vpt_renderer.module().load_transfer_function_file_gradient(args.transfer_function_grad)
+        if args.transfer_function_grad_range_min is not None and args.transfer_function_grad_range_max is not None:
+            vpt_renderer.module().set_transfer_function_range_gradient(args.transfer_function_grad_range_min, args.transfer_function_grad_range_max)
 
     if args.iso_value is not None:
         vpt_renderer.module().set_use_isosurfaces(True)
