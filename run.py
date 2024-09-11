@@ -260,7 +260,7 @@ for samples in []:  # 1024
 
 #brain_presets = []
 #brain_presets = [1, 2, 3, 4, 5, 6, 7]
-brain_presets = [7, 8, 9]
+brain_presets = [8, 9]
 if 1 in brain_presets:
     commands.append([
         'python3', 'src/main.py', '--test_case', 'Brain', '--img_res', '2048', '--num_frames', '128',
@@ -319,6 +319,7 @@ if 8 in brain_presets:
         '--denoiser', 'OpenImageDenoise',
         '--envmap',
         os.path.join(pathlib.Path.home(), 'Programming/C++/CloudRendering/Data/CloudDataSets/env_maps/op_room2.exr'),
+        '--envmap_rot_camera',
         '--transfer_function_grad', str(pathlib.Path.home()) + '/Programming/C++/CloudRendering/Data/TransferFunctions/BrainGrad2.xml',
         '--transfer_function_grad_range_min', '0.0', '--transfer_function_grad_range_max', '0.08',
         '--brdf', 'Cook Torrance', '--brdf_parameters', 'metallic=0.0', 'specular=0.8', 'roughness=0.3',
@@ -330,6 +331,7 @@ if 9 in brain_presets:
         '--denoiser', 'OpenImageDenoise',
         '--envmap',
         os.path.join(pathlib.Path.home(), 'Programming/C++/CloudRendering/Data/CloudDataSets/env_maps/op_room2.exr'),
+        '--envmap_rot_camera',
         '--transfer_function_grad', str(pathlib.Path.home()) + '/Programming/C++/CloudRendering/Data/TransferFunctions/BrainGrad2.xml',
         '--transfer_function_grad_range_min', '0.0', '--transfer_function_grad_range_max', '0.08',
         '-o', os.path.join(pathlib.Path.home(), 'datasets/VPT/brain/preset9')
@@ -346,7 +348,7 @@ if shall_train_3dgs and train_3dgs:
     res = 1
     scenes = ["brain"]
     #presets = [1, 2, 3, 4, 5, 6, 7, 8, 9]
-    presets = [7, 8, 9]
+    presets = [8, 9]
     settings = list(itertools.product(scenes, presets))
     for (scene, preset) in settings:
         densify_grad_threshold = '0.0001'
