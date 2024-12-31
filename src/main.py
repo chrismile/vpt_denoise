@@ -836,7 +836,7 @@ if __name__ == '__main__':
                 if use_png_format:
                     save_tensor_png(f'{out_dir}/images/{fg_name}', vpt_test_tensor_cuda.cpu().numpy())
                 else:
-                    save_tensor_openexr(f'{out_dir}/images/{fg_name}', vpt_test_tensor_cuda.cpu().numpy())
+                    save_tensor_openexr(f'{out_dir}/images/{fg_name}', vpt_test_tensor_cuda.cpu().numpy(), use_alpha=True)
             else:
                 save_tensor_openexr(f'{out_dir}/{fg_name}', vpt_test_tensor_cuda.cpu().numpy(), use_alpha=True)
 
