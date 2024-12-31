@@ -268,6 +268,7 @@ if __name__ == '__main__':
     parser.add_argument('--use_lights_from')
     parser.add_argument('--use_black_bg', action='store_true', default=False)
     parser.add_argument('--denoiser')
+    parser.add_argument('--exr', action='store_true', default=False)  # Save .exr images.
     parser.add_argument('--pytorch_denoiser_model_file')  # Only if denoiser name starts with 'PyTorch'
     parser.add_argument('--denoiser_settings', metavar="KEY=VALUE", nargs='+')
     parser.add_argument('--write_performance_info', action='store_true', default=False)
@@ -340,6 +341,9 @@ if __name__ == '__main__':
         vpt_renderer.module().set_global_world_bounding_box(args.global_bbox)
 
     gaussian_splatting_data = True
+    use_png_format = gaussian_splatting_data
+    if args.exr:
+        use_png_format = False
     if args.out_dir is None:
         out_dir = f'out_{datetime.datetime.now():%Y-%m-%d_%H:%M:%S}'
     else:
@@ -382,6 +386,9 @@ if __name__ == '__main__':
     elif test_case == 'Brain':
         vpt_renderer.module().load_volume_file(
             str(pathlib.Path.home()) + '/datasets/Siemens/brain_cleaned/23.42um_4_cleaned.dat')
+    elif test_case == 'ToothIso':
+        vpt_renderer.module().load_volume_file(
+            data_dir + 'Tooth [256 256 161](CT)/tooth_cropped.dat')
     vpt_renderer.module().load_environment_map(args.envmap)
     if args.envmap_intensity is not None:
         vpt_renderer.module().set_environment_map_intensity(args.envmap_intensity)
@@ -416,6 +423,8 @@ if __name__ == '__main__':
             str(pathlib.Path.home()) + '/Programming/C++/CloudRendering/Data/TransferFunctions/BrainDens.xml')
         vpt_renderer.module().load_transfer_function_file_gradient(
             str(pathlib.Path.home()) + '/Programming/C++/CloudRendering/Data/TransferFunctions/BrainGrad.xml')
+    elif test_case == 'ToothIso':
+        vpt_renderer.module().set_transfer_function_empty()
 
     if args.render_mode is not None:
         mode = args.render_mode
@@ -466,6 +475,9 @@ if __name__ == '__main__':
     #vpt_renderer.module().set_vpt_mode_from_name('Delta Tracking')
     vpt_renderer.module().set_vpt_mode_from_name(mode)
 
+    r_min = None
+    r_max = None
+
     iso_value = 0.0
     if test_case == 'Custom':
         vpt_renderer.module().set_use_transfer_function(args.transfer_function is not None)
@@ -515,6 +527,13 @@ if __name__ == '__main__':
             vpt_renderer.module().set_use_builtin_environment_map('Black')
             vpt_renderer.module().set_use_headlight_distance(False)
             vpt_renderer.module().set_headlight_intensity(6.0)
+    elif test_case == 'ToothIso':
+        vpt_renderer.module().set_use_isosurfaces(True)
+        iso_value = 0.5
+        vpt_renderer.module().set_iso_value(iso_value)
+        vpt_renderer.module().set_use_legacy_normals(True)
+        r_min = 1.75
+        r_max = 1.85
 
     if args.transfer_function is not None:
         vpt_renderer.module().set_use_transfer_function(True)
@@ -581,6 +600,11 @@ if __name__ == '__main__':
         shall_sample_completely_random_views = False
         use_mixed_mode = False
         use_visibility_aware_sampling = False
+    elif test_case == 'ToothIso':
+        shall_sample_completely_random_views = False
+        use_mixed_mode = False
+        use_visibility_aware_sampling = False
+        is_spherical = True
     ds = 2
     vpt_renderer.module().set_secondary_volume_downscaling_factor(ds)
     # use_bos = False  # Bayesian optimal sampling
@@ -641,7 +665,7 @@ if __name__ == '__main__':
                         if shall_sample_completely_random_views:
                             view_matrix_array, vm, ivm, _ = sample_random_view(aabb)
                         elif is_spherical:
-                            view_matrix_array, vm, ivm = sample_view_matrix_circle(aabb)
+                            view_matrix_array, vm, ivm = sample_view_matrix_circle(aabb, r_min=r_min, r_max=r_max)
                         else:
                             view_matrix_array, vm, ivm = sample_view_matrix_box(aabb)
                         is_valid = check_camera_is_valid(occupation_volume, aabb, vm, ivm, fovy, aspect)
@@ -729,7 +753,7 @@ if __name__ == '__main__':
             if shall_sample_completely_random_views:
                 view_matrix_array, vm, ivm, _ = sample_random_view(aabb)
             elif is_spherical:
-                view_matrix_array, vm, ivm = sample_view_matrix_circle(aabb)
+                view_matrix_array, vm, ivm = sample_view_matrix_circle(aabb, r_min=r_min, r_max=r_max)
             else:
                 view_matrix_array, vm, ivm = sample_view_matrix_box(aabb)
 
@@ -801,19 +825,28 @@ if __name__ == '__main__':
         if 'img_name' not in camera_info:
             vpt_test_tensor_cuda = vpt_renderer(test_tensor_cuda)
             render_time += time.time() - begin_render
-            if gaussian_splatting_data:
+            if use_png_format:
                 fg_name = f'fg_{i}.png'
-                save_tensor_png(f'{out_dir}/images/{fg_name}', vpt_test_tensor_cuda.cpu().numpy())
+                bg_name = f'bg_{i}.png'
             else:
                 fg_name = f'fg_{i}.exr'
+                bg_name = f'bg_{i}.exr'
+
+            if gaussian_splatting_data:
+                if use_png_format:
+                    save_tensor_png(f'{out_dir}/images/{fg_name}', vpt_test_tensor_cuda.cpu().numpy())
+                else:
+                    save_tensor_openexr(f'{out_dir}/images/{fg_name}', vpt_test_tensor_cuda.cpu().numpy())
+            else:
                 save_tensor_openexr(f'{out_dir}/{fg_name}', vpt_test_tensor_cuda.cpu().numpy(), use_alpha=True)
 
             image_background = vpt_renderer.module().get_feature_map_from_string(test_tensor_cuda, 'Background')
             if gaussian_splatting_data:
-                bg_name = f'bg_{i}.png'
-                save_tensor_png(f'{out_dir}/images/{bg_name}', image_background.cpu().numpy())
+                if use_png_format:
+                    save_tensor_png(f'{out_dir}/images/{bg_name}', image_background.cpu().numpy())
+                else:
+                    save_tensor_openexr(f'{out_dir}/images/{bg_name}', image_background.cpu().numpy())
             else:
-                bg_name = f'bg_{i}.exr'
                 save_tensor_openexr(f'{out_dir}/{bg_name}', image_background.cpu().numpy())
             #save_camera_config(f'{out_dir}/intrinsics_{i}.txt', vpt_renderer.module().get_camera_view_matrix())
 

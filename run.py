@@ -125,6 +125,13 @@ commands = [
     #    '--scattering_albedo', '0.99', '--extinction_scale', '400.0',
     #    '-o', os.path.join(pathlib.Path.home(), 'datasets/VPT/multiclouds/spp_256_noisy/incomming_0057')
     #],
+    [
+        'python3', 'src/main.py', '--test_case', 'ToothIso', '--img_res', '1024', '--num_frames', '128',
+        '--denoiser', 'OpenImageDenoise',
+        '--envmap', os.path.join(pathlib.Path.home(), 'Programming/C++/CloudRendering/Data/CloudDataSets/env_maps/belfast_sunset_puresky_4k_2.exr'),
+        '--brdf', 'Lambertian',
+        '-o', os.path.join(pathlib.Path.home(), 'datasets/VPT/toothiso'), '--exr'
+    ],
 ]
 
 for samples in []:  # [4, 256]
@@ -259,8 +266,8 @@ for samples in []:  # 1024
         ])
 
 #brain_presets = []
-#brain_presets = [1, 2, 3, 4, 5, 6, 7]
-brain_presets = [8, 9]
+#brain_presets = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+brain_presets = []
 if 1 in brain_presets:
     commands.append([
         'python3', 'src/main.py', '--test_case', 'Brain', '--img_res', '2048', '--num_frames', '128',
@@ -338,7 +345,7 @@ if 9 in brain_presets:
     ])
 
 # The following code is for training 3DGS models; the script train.py is currently not yet publicly released.
-shall_train_3dgs = True
+shall_train_3dgs = False
 train_script = os.path.join(pathlib.Path.home(), 'Programming/DL/gaussian_me/train.py')
 train_3dgs = os.path.exists(train_script)
 if shall_train_3dgs and train_3dgs:
