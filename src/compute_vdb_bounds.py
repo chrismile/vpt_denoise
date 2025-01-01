@@ -25,7 +25,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import numpy as np
-from vpt import VolumetricPathTracingRenderer
+from vpt_local import VolumetricPathTracingRenderer
 
 
 if __name__ == '__main__':

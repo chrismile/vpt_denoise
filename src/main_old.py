@@ -27,7 +27,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-from vpt import VolumetricPathTracingRenderer
+from vpt_local import VolumetricPathTracingRenderer
 import time
 
 if __name__ == '__main__':

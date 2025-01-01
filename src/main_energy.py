@@ -39,7 +39,7 @@ import torch
 import OpenEXR
 import Imath
 import array
-from vpt import VolumetricPathTracingRenderer
+from vpt_local import VolumetricPathTracingRenderer
 import time
 #from netCDF4 import Dataset
 from util.sample_view import *

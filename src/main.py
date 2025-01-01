@@ -36,7 +36,7 @@ import numpy as np
 from scipy.spatial.transform import Rotation as Rotation
 import torch
 import array
-from vpt import VolumetricPathTracingRenderer
+from vpt_local import VolumetricPathTracingRenderer
 import time
 import argparse
 #from netCDF4 import Dataset

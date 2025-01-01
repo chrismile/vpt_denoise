@@ -26,7 +26,7 @@ import random
 import pathlib
 import json
 import numpy as np
-from vpt import VolumetricPathTracingRenderer
+from vpt_local import VolumetricPathTracingRenderer
 from util.sample_view import *
 from util.save_tensor import *
 
